@@ -193,7 +193,6 @@ class StylizedChoiceTransforms:
         else:
             raise ValueError("Invalid dict key for stylized choice transform.")
 
-
 class CustomTA_color(transforms_v2.TrivialAugmentWide):
     _AUGMENTATION_SPACE = {
     "Identity": (lambda num_bins, height, width: None, False),

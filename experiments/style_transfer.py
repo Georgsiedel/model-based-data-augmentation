@@ -20,7 +20,7 @@ import adaIN.utils as utils
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 encoder_rel_path = 'adaIN/vgg_normalised.pth'
 decoder_rel_path = 'adaIN/decoder.pth'
-style_feats_rel_path = 'adaIN/style_feats_adain_1000.npy'
+style_feats_rel_path = '../../data/style_feats_adain_1000.npy'
 encoder_path = os.path.join(current_dir, encoder_rel_path)
 decoder_path = os.path.join(current_dir, decoder_rel_path)
 style_feats_path = os.path.join(current_dir, style_feats_rel_path)

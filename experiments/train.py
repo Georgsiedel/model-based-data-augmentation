@@ -31,9 +31,10 @@ import torch.backends.cudnn as cudnn
 torch.cuda.empty_cache()
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 #torch.backends.cudnn.enabled = False #this may resolve some cuDNN errors, but increases training time by ~200%
-torch.cuda.set_device(0)
-cudnn.benchmark = False #this slightly speeds up 32bit precision training (5%). False helps achieve reproducibility
-cudnn.deterministic = True
+if torch.cuda.is_available():
+    torch.cuda.set_device(0)
+    cudnn.benchmark = False #this slightly speeds up 32bit precision training (5%). False helps achieve reproducibility
+    cudnn.deterministic = True
 
 parser = argparse.ArgumentParser(description='PyTorch Training with perturbations')
 parser.add_argument('--resume', type=utils.str2bool, nargs='?', const=False, default=False,
