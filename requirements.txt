@@ -9,9 +9,7 @@ tqdm
 scikit-learn
 scikit-image
 joblib
-timm
 cleverhans
 pillow
 autoattack @ git+https://github.com/fra31/auto-attack
-foolbox
 adversarial-robustness-toolbox
