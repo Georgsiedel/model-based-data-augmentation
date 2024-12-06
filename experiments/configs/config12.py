@@ -17,13 +17,13 @@ noise_patch_scale = {'lower': 0.2, 'upper': 0.7}
 combine_train_corruptions = True #augment the train dataset with all corruptions
 concurrent_combinations = 1 #only has an effect if combine_train_corruption is True
 
-batchsize = 512
-minibatchsize = 8
-dataset = 'CIFAR100' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
-generated_ratio = 0.5
+batchsize = 1
+minibatchsize = 1
+dataset = 'CIFAR10' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
+generated_ratio = 0.0
 normalize = True
 validontest = True
-validonc = True
+validonc = False
 validonadv = False
 lrschedule = 'CosineAnnealingWarmRestarts'
 learningrate = 0.15
@@ -34,13 +34,13 @@ earlystop = False
 earlystopPatience = 15
 optimizer = 'SGD'
 optimizerparams = {'momentum': 0.9, 'weight_decay': 1e-4, 'nesterov': True}
-number_workers = 0
+number_workers = 4
 modeltype = 'WideResNet_28_4'
 modelparams = {'dropout_rate': 0.2, 'activation_function': 'silu'}
 resize = False
 aug_strat_check = True
-train_aug_strat_orig = 'TrivialAugmentWide' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
-train_aug_strat_gen = 'StyleAndTA' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+train_aug_strat_orig = 'TAorStyle0.1' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+train_aug_strat_gen = 'TAorStyle0.1' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 loss = 'CrossEntropyLoss'
 lossparams = {'label_smoothing': 0.1}
 trades_loss = False
@@ -110,7 +110,7 @@ test_corruptions = np.array([
 {'noise_type': 'gaussian', 'epsilon': 0.2, 'sphere': False, 'distribution': 'max'}
 ])
 
-test_on_c = True
+test_on_c = False
 combine_test_corruptions = True #augment the test dataset with all corruptions
 calculate_adv_distance = False
 adv_distance_params = {'setsize': 500, 'iters_pgd': 500, 'eps_iter': [0.0003,0.005,0.2], 'iters_second_attack': 40, 'norm': ['inf', 2, 1],

@@ -13,7 +13,7 @@ import torch.multiprocessing as mp
 
 import numpy as np
 from tqdm import tqdm
-import torch.cuda.amp
+import torch.amp
 import torch.optim as optim
 from torch.optim.swa_utils import AveragedModel, SWALR
 import torchvision.models as torchmodels
@@ -142,7 +142,7 @@ def train_epoch(pbar):
             inputs = Dataloader.transforms_gpu(inputs, sources, apply_gpu_transform)
         
         inputs, targets = inputs.to(device, dtype=torch.float32), targets.to(device)
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast(device_type=device):
             outputs, mixed_targets = model(inputs, targets, criterion.robust_samples, train_corruptions, args.mixup['alpha'],
                                            args.mixup['p'], args.manifold['apply'], args.manifold['noise_factor'],
                                            args.cutmix['alpha'], args.cutmix['p'], args.minibatchsize,
@@ -158,7 +158,8 @@ def train_epoch(pbar):
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0, norm_type=2.0)
         Scaler.step(optimizer)
         Scaler.update()
-        torch.cuda.synchronize()
+        if device == 'cuda':
+            torch.cuda.synchronize()
         train_loss += loss.item()
 
         _, predicted = outputs.max(1)
@@ -186,7 +187,7 @@ def valid_epoch(pbar, net):
 
             inputs, targets = inputs.to(device, dtype=torch.float32), targets.to(device)
 
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast(device_type=device):
 
                 if args.validonadv == True:
                     adv_inputs, outputs = fast_gradient_validation(model_fn=net, eps=8/255, x=inputs, y=None,
@@ -232,7 +233,7 @@ if __name__ == '__main__':
     Dataloader = data.DataLoading(args.dataset, args.epochs, args.generated_ratio, args.resize, args.run)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
     Dataloader.load_base_data(args.validontest, args.run)
-    testsets_c = Dataloader.load_data_c(subset=args.validonc, subsetsize=100)
+    testsets_c = Dataloader.load_data_c(subset=args.validonc, subsetsize=100) if args.validonc else None
 
     vgg, decoder = style_transfer.load_models()
     style_feats = style_transfer.load_feat_files()
@@ -268,7 +269,7 @@ if __name__ == '__main__':
         swa_scheduler = SWALR(optimizer, anneal_strategy="linear", anneal_epochs=5, swa_lr=args.learningrate * args.swa['lr_factor'])
     else:
         swa_model, swa_scheduler = None, None
-    Scaler = torch.cuda.amp.GradScaler()
+    Scaler = torch.amp.GradScaler(device=device)
     Checkpointer = utils.Checkpoint(args.combine_train_corruptions, args.dataset, args.modeltype, args.experiment,
                                     train_corruptions, args.run, earlystopping=args.earlystop, patience=args.earlystopPatience,
                                     verbose=False,  checkpoint_path=f'experiments/trained_models/checkpoint_{args.experiment}.pt')

@@ -29,9 +29,9 @@ def load_models():
 
     vgg = adaINmodel.vgg
     decoder = adaINmodel.decoder
-    vgg.load_state_dict(torch.load(encoder_path))
+    vgg.load_state_dict(torch.load(encoder_path, weights_only=True))
     vgg = nn.Sequential(*list(vgg.children())[:31])
-    decoder.load_state_dict(torch.load(decoder_path))
+    decoder.load_state_dict(torch.load(decoder_path, weights_only=True))
 
     vgg.to(device)
     decoder.to(device)
