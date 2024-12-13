@@ -3,27 +3,27 @@ import numpy as np
 train_corruptions = np.array([
 #{'noise_type': 'standard', 'epsilon': 0.0, 'sphere': False, 'distribution': 'beta2-5'},
 #{'noise_type': 'uniform-linf', 'epsilon': 0.1, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'gaussian', 'epsilon': 0.15, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l0.5', 'epsilon': 400000.0, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l1', 'epsilon': 200.0, 'sphere': False, 'distribution': 'uniform'},
+{'noise_type': 'gaussian', 'epsilon': 0.3, 'sphere': False, 'distribution': 'uniform'},
+{'noise_type': 'uniform-l0.5', 'epsilon': 12000000.0, 'sphere': False, 'distribution': 'uniform'},
+{'noise_type': 'uniform-l1', 'epsilon': 1500.0, 'sphere': False, 'distribution': 'uniform'},
 #{'noise_type': 'uniform-l2', 'epsilon': 5.0, 'sphere': False, 'distribution': 'uniform'},
 #{'noise_type': 'uniform-l5', 'epsilon': 0.6, 'sphere': False, 'distribution': 'uniform'},
 #{'noise_type': 'uniform-l50', 'epsilon': 0.18, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l0-impulse', 'epsilon': 0.2, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l0-impulse', 'epsilon': 0.15, 'sphere': True, 'distribution': 'uniform'}
+{'noise_type': 'uniform-l0-impulse', 'epsilon': 0.4, 'sphere': False, 'distribution': 'uniform'},
+{'noise_type': 'uniform-l0-impulse', 'epsilon': 0.3, 'sphere': True, 'distribution': 'uniform'}
 ])
 noise_sparsity = 1.0
 noise_patch_scale = {'lower': 0.2, 'upper': 0.7}
 combine_train_corruptions = True #augment the train dataset with all corruptions
 concurrent_combinations = 1 #only has an effect if combine_train_corruption is True
 
-batchsize = 1
-minibatchsize = 1
-dataset = 'CIFAR10' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
-generated_ratio = 0.0
+batchsize = 512
+minibatchsize = 8
+dataset = 'TinyImageNet' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
+generated_ratio = 0.5
 normalize = True
 validontest = True
-validonc = False
+validonc = True
 validonadv = False
 lrschedule = 'CosineAnnealingWarmRestarts'
 learningrate = 0.15
@@ -34,7 +34,7 @@ earlystop = False
 earlystopPatience = 15
 optimizer = 'SGD'
 optimizerparams = {'momentum': 0.9, 'weight_decay': 1e-4, 'nesterov': True}
-number_workers = 4
+number_workers = 0
 modeltype = 'WideResNet_28_4'
 modelparams = {'dropout_rate': 0.2, 'activation_function': 'silu'}
 resize = False

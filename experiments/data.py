@@ -217,13 +217,14 @@ class CustomTA_geometric(transforms_v2.TrivialAugmentWide):
     }
 
 class DataLoading():
-    def __init__(self, dataset, epochs=200, generated_ratio=0.0, resize = False, run=0, test_only = False):
+    def __init__(self, dataset, epochs=200, generated_ratio=0.0, resize = False, run=0, test_only = False, factor = 1):
         self.dataset = dataset
         self.generated_ratio = generated_ratio
         self.resize = resize
         self.run = run
         self.epochs = epochs
         self.test_only = test_only
+        self.factor = factor
 
     def create_transforms(self, train_aug_strat_orig, train_aug_strat_gen, RandomEraseProbability=0.0):
         # list of all data transformations used
@@ -245,8 +246,9 @@ class DataLoading():
             vgg, decoder = style_transfer.load_models()
             style_feats = style_transfer.load_feat_files()
             self.stylization_prob = probability
+            pixels = 224 if self.dataset=='ImageNet' else 32 * self.factor
 
-            Stylize = style_transfer.NSTTransform(style_feats, vgg, decoder, alpha_min=alpha_min, alpha_max=alpha_max, probability=probability)
+            Stylize = style_transfer.NSTTransform(style_feats, vgg, decoder, alpha_min=alpha_min, alpha_max=alpha_max, probability=probability, pixels=pixels)
             return Stylize
 
         def transform_not_found(train_aug_strat, dataset):

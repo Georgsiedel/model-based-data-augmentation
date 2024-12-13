@@ -230,18 +230,10 @@ if __name__ == '__main__':
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams
     criterion = losses.Criterion(args.loss, trades_loss=args.trades_loss, robust_loss=args.robust_loss, **lossparams)
 
-    Dataloader = data.DataLoading(args.dataset, args.epochs, args.generated_ratio, args.resize, args.run)
+    Dataloader = data.DataLoading(args.dataset, args.epochs, args.generated_ratio, args.resize, args.run, factor=args.pixel_factor)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
     Dataloader.load_base_data(args.validontest, args.run)
     testsets_c = Dataloader.load_data_c(subset=args.validonc, subsetsize=100) if args.validonc else None
-
-    vgg, decoder = style_transfer.load_models()
-    style_feats = style_transfer.load_feat_files()
-
-    Stylize = style_transfer.NSTTransform(style_feats, vgg, decoder, alpha_min=0.2, alpha_max=1.0, probability=0.3)
-    re = transforms.RandomErasing(p=0.3, scale=(0.02, 0.4), value='random')
-    ta = transforms.TrivialAugmentWide()
-    comp = transforms.Compose([ta, re])
 
     # Construct model
     print(f'\nBuilding {args.modeltype} model with {args.modelparams} | Loss Function: {args.loss}, Stability Loss: {args.robust_loss}, Trades Loss: {args.trades_loss}')

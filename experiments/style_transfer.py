@@ -63,14 +63,14 @@ class NSTTransform(transforms.Transform):
     rand_max = Maximum value of alpha if randomized
 
      """
-    def __init__(self, style_feats, vgg, decoder, alpha_min=1.0, alpha_max=1.0, probability=0.5):
+    def __init__(self, style_feats, vgg, decoder, alpha_min=1.0, alpha_max=1.0, probability=0.5, pixels=32):
         super().__init__()
         self.vgg = vgg
         self.decoder = decoder
         self.alpha_min = alpha_min
         self.alpha_max = alpha_max
-        self.upsample = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
-        self.downsample = nn.Upsample(size=(32, 32), mode='bilinear', align_corners=False)
+        self.upsample = nn.Upsample(size=(pixels, pixels), mode='bilinear', align_corners=False)
+        self.downsample = nn.Upsample(size=(pixels, pixels), mode='bilinear', align_corners=False)
         self.to_tensor = transforms.Compose([transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True)])
         self.style_features = style_feats
         self.num_styles = len(style_feats)
