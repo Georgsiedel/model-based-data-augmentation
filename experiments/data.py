@@ -1,6 +1,5 @@
 import random
-import time
-import gc
+import os
 
 import torch
 from PIL import Image
@@ -382,10 +381,10 @@ class DataLoading():
         # Trainset and Validset
         if self.test_only == False:
             if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                self.base_trainset = torchvision.datasets.ImageFolder(root=f'../data/{self.dataset}/train')
+                self.base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train'))
             else:
                 load_helper = getattr(torchvision.datasets, self.dataset)
-                self.base_trainset = load_helper(root='../data', train=True, download=True)
+                self.base_trainset = load_helper(root=os.path.abspath('../data'), train=True, download=True)
 
             if validontest == False:
                 validsplit = 0.2
@@ -400,11 +399,11 @@ class DataLoading():
                 self.validset = list(map(self.transforms_preprocess, self.validset))
             else:
                 if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                    self.validset = torchvision.datasets.ImageFolder(root=f'../data/{self.dataset}/val',
+                    self.validset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/val'),
                                                                 transform=self.transforms_preprocess)
                 elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
                     load_helper = getattr(torchvision.datasets, self.dataset)
-                    self.validset = load_helper(root='../data', train=False, download=True,
+                    self.validset = load_helper(root=os.path.abspath('../data'), train=False, download=True,
                                            transform=self.transforms_preprocess)
                 else:
                     print('Dataset not loadable')
@@ -414,19 +413,20 @@ class DataLoading():
 
         #Testset
         if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-            self.testset = torchvision.datasets.ImageFolder(root=f'../data/{self.dataset}/val',
+            self.testset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/val'),
                                                         transform=self.transforms_preprocess)
         elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
             load_helper = getattr(torchvision.datasets, self.dataset)
-            self.testset = load_helper(root='../data', train=False, download=True, transform=self.transforms_preprocess)
+            self.testset = load_helper(root=os.path.abspath('../data'), train=False, download=True, transform=self.transforms_preprocess)
         else:
             print('Dataset not loadable')
+
         self.num_classes = len(self.testset.classes)
     
     def load_augmented_traindata(self, target_size, epoch=0, robust_samples=0):
         self.robust_samples = robust_samples
         self.target_size = target_size
-        self.generated_dataset = np.load(f'../data/{self.dataset}-add-1m-dm.npz',
+        self.generated_dataset = np.load(os.path.abspath(f'../data/{self.dataset}-add-1m-dm.npz'),
                                     mmap_mode='r') if self.generated_ratio > 0.0 else None
         self.epoch = epoch
 
@@ -442,7 +442,9 @@ class DataLoading():
             self.num_generated = 0
             self.num_original = self.target_size
             generated_images, generated_labels = [], []
+            print(self.base_trainset)
             original_images, original_labels = map(list, zip(*self.base_trainset))
+            print('done')
             if isinstance(original_images[0], torch.Tensor):
                 original_images = TF.to_pil_image(original_images)
             sources = [True] * len(self.base_trainset)
@@ -494,7 +496,7 @@ class DataLoading():
 #                batch, batch_stylized = self.transforms_gen_gpu(batch)
 #                generated_images[i:min(i + batch_size, self.num_generated)] = batch
 #                stylized[i:min(i + batch_size, self.num_generated)] = batch_stylized
-
+        print(type(original_images), type(generated_images))
         self.trainset = AugmentedDataset(original_images + generated_images, original_labels + generated_labels, sources,
                                         self.transforms_preprocess, self.transforms_basic, self.transforms_orig_cpu, 
                                         self.transforms_orig_gpu, self.transforms_gen_cpu, self.transforms_gen_gpu, self.robust_samples)
@@ -503,16 +505,16 @@ class DataLoading():
 
         c_datasets = []
         #c-corruption benchmark: https://github.com/hendrycks/robustness
-        corruptions_c = np.asarray(np.loadtxt('../data/c-labels.txt', dtype=list))
+        corruptions_c = np.asarray(np.loadtxt(os.path.abspath('../data/c-labels.txt'), dtype=list))
 
         if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
             #c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
-            corruptions_bar = np.asarray(np.loadtxt('../data/c-bar-labels-cifar.txt', dtype=list))
+            corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-cifar.txt'), dtype=list))
             corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
 
             for corruption, set in corruptions:
                 subtestset = self.testset
-                np_data_c = np.load(f'../data/{self.dataset}-{set}/{corruption}.npy')
+                np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'))
                 np_data_c = np.array(np.array_split(np_data_c, 5))
 
                 if subset == True:
@@ -526,10 +528,10 @@ class DataLoading():
 
         elif self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
             #c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
-            corruptions_bar = np.asarray(np.loadtxt('../data/c-bar-labels-IN.txt', dtype=list))
+            corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-IN.txt'), dtype=list))
             corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
             for corruption, set in corruptions:
-                intensity_datasets = [torchvision.datasets.ImageFolder(root=f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity),
+                intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity)),
                                                                        transform=self.transforms_preprocess) for intensity in range(1, 6)]
                 if subset == True:
                     selected_indices = np.random.choice(len(intensity_datasets[0]), subsetsize, replace=False)

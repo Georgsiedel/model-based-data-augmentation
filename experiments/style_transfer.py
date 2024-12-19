@@ -4,7 +4,7 @@ import numpy as np
 
 current_dir = os.path.dirname(__file__)
 module_path = os.path.abspath(current_dir)
-import time
+
 import math
 import random
 
@@ -21,9 +21,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 encoder_rel_path = 'adaIN/vgg_normalised.pth'
 decoder_rel_path = 'adaIN/decoder.pth'
 style_feats_rel_path = '../../data/style_feats_adain_1000.npy'
-encoder_path = os.path.join(current_dir, encoder_rel_path)
-decoder_path = os.path.join(current_dir, decoder_rel_path)
-style_feats_path = os.path.join(current_dir, style_feats_rel_path)
+encoder_path = os.path.abspath(os.path.join(current_dir, encoder_rel_path))
+decoder_path = os.path.abspath(os.path.join(current_dir, decoder_rel_path))
+style_feats_path = os.path.abspath(os.path.join(current_dir, style_feats_rel_path))
 
 def load_models():
 
@@ -89,7 +89,6 @@ class NSTTransform(transforms.Transform):
 
         idx = torch.randperm(self.num_styles)[0:ratio]
         idy = torch.randperm(x.size(0))[0:ratio]
-        
         x[idy] = self.style_transfer(self.vgg, self.decoder, x[idy], self.style_features[idx])
 
         stl_imgs = self.downsample(x)

@@ -5,6 +5,7 @@ import torch
 import shutil
 import argparse
 import ast
+import os
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -123,12 +124,12 @@ class Checkpoint:
         self.delta = delta
         self.trace_func = trace_func
         self.early_stopping = earlystopping
-        self.checkpoint_path = checkpoint_path
+        self.checkpoint_path = os.path.abspath(checkpoint_path)
         if combine_train_corruptions:
-            self.final_model_path = f'./experiments/trained_models/{dataset}/{modeltype}/config{experiment}_run_{run}.pth'
+            self.final_model_path = os.path.abspath(f'./experiments/trained_models/{dataset}/{modeltype}/config{experiment}_run_{run}.pth')
         else:
-            self.final_model_path = f'./experiments/trained_models/{dataset}/{modeltype}/config{experiment}_' \
-                    f'{train_corruption["noise_type"]}_eps_{train_corruption["epsilon"]}_{train_corruption["sphere"]}_run_{run}.pth'
+            self.final_model_path = os.path.abspath(f'./experiments/trained_models/{dataset}/{modeltype}/config{experiment}_' \
+                    f'{train_corruption["noise_type"]}_eps_{train_corruption["epsilon"]}_{train_corruption["sphere"]}_run_{run}.pth')
 
 
     def earlystopping(self, val_acc):
@@ -154,10 +155,10 @@ class Checkpoint:
     def load_model(self, model, swa_model, optimizer, scheduler, swa_scheduler, type='standard'):
         checkpoint = torch.load(self.checkpoint_path)
         if type == 'standard':
-            model.module.load_state_dict(checkpoint['model_state_dict'], strict=True)
+            model.load_state_dict(checkpoint['model_state_dict'], strict=True)
             start_epoch = checkpoint['epoch'] + 1
         elif type == 'best':
-            model.module.load_state_dict(checkpoint['best_model_state_dict'], strict=True)
+            model.load_state_dict(checkpoint['best_model_state_dict'], strict=True)
             start_epoch = checkpoint['best_epoch'] + 1
         else:
             print('only best_checkpoint or checkpoint can be loaded')
@@ -179,19 +180,19 @@ class Checkpoint:
         if self.best_model == True:
             torch.save({
                 'epoch': epoch,
-                'model_state_dict': model.module.state_dict(),
+                'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
                 'swa_model_state_dict': swa_model,
                 'swa_scheduler_state_dict': swa_scheduler,
                 'best_epoch': epoch,
-                'best_model_state_dict': model.module.state_dict(),
+                'best_model_state_dict': model.state_dict(),
             }, self.checkpoint_path)
 
         else:
             checkpoint = torch.load(self.checkpoint_path)
             checkpoint['epoch'] = epoch
-            checkpoint['model_state_dict'] = model.module.state_dict()
+            checkpoint['model_state_dict'] = model.state_dict()
             checkpoint['optimizer_state_dict'] = optimizer.state_dict()
             checkpoint['scheduler_state_dict'] = scheduler.state_dict()
             checkpoint['swa_model_state_dict'] = swa_model
@@ -222,8 +223,8 @@ class TrainTracking:
 
     def load_learning_curves(self):
 
-        learning_curve_frame = pd.read_csv(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_'
-                                           f'learning_curve_run_{self.run}.csv', sep=';', decimal=',')
+        learning_curve_frame = pd.read_csv(os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_'
+                                           f'learning_curve_run_{self.run}.csv'), sep=';', decimal=',')
         train_accs = learning_curve_frame.iloc[:, 0].values.tolist()
         train_losses = learning_curve_frame.iloc[:, 1].values.tolist()
         valid_accs = learning_curve_frame.iloc[:, 2].values.tolist()
@@ -286,8 +287,8 @@ class TrainTracking:
                 columns = columns + 1
             if self.validonadv == True:
                 learning_curve_frame.insert(columns+1, "valid_accuracy_adversarial_swa", self.valid_accs_adv_swa)
-        learning_curve_frame.to_csv(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_'
-                                    f'learning_curve_run_{self.run}.csv',
+        learning_curve_frame.to_csv(os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_'
+                                    f'learning_curve_run_{self.run}.csv'),
                                     index=False, header=True, sep=';', float_format='%1.4f', decimal=',')
 
         x = list(range(1, len(self.train_accs) + 1))
@@ -315,12 +316,12 @@ class TrainTracking:
         plt.ylabel('Accuracy')
         plt.xticks(np.linspace(1, len(self.train_accs), num=10, dtype=int))
         plt.legend(loc='best')
-        plt.savefig(f'results/{self.dataset}/{self.modeltype}/config{self.experiment}_learning_curve_run_{self.run}.svg')
+        plt.savefig(os.path.abspath(f'results/{self.dataset}/{self.modeltype}/config{self.experiment}_learning_curve_run_{self.run}.svg'))
         plt.close()
 
     def save_config(self):
-        shutil.copyfile(f'./experiments/configs/config{self.experiment}.py',
-                        f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}.py')
+        shutil.copyfile(os.path.abspath(f'./experiments/configs/config{self.experiment}.py'),
+                        os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}.py'))
 
     def print_results(self):
         print("Maximum (non-SWA) validation accuracy of", max(self.valid_accs), "achieved after",
@@ -389,11 +390,11 @@ class TestTracking:
 
         test_corruptions_string = np.array(['Standard_Acc', 'RMSCE'])
         if self.test_on_c == True:
-            test_corruptions_label = np.loadtxt('../data/c-labels.txt', dtype=list)
+            test_corruptions_label = np.loadtxt(os.path.abspath('../data/c-labels.txt'), dtype=list)
             if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
-                test_corruptions_bar_label = np.loadtxt('../data/c-bar-labels-cifar.txt', dtype=list)
+                test_corruptions_bar_label = np.loadtxt(os.path.abspath('../data/c-bar-labels-cifar.txt'), dtype=list)
             elif self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                test_corruptions_bar_label = np.loadtxt('../data/c-bar-labels-IN.txt', dtype=list)
+                test_corruptions_bar_label = np.loadtxt(os.path.abspath('../data/c-bar-labels-IN.txt'), dtype=list)
             test_corruptions_string = np.append(test_corruptions_string, test_corruptions_label, axis=0)
             test_corruptions_string = np.append(test_corruptions_string, test_corruptions_bar_label, axis=0)
             test_corruptions_string = np.append(test_corruptions_string,
@@ -421,7 +422,7 @@ class TestTracking:
 
         avg_report_frame = pd.DataFrame(self.avg_test_metrics, index=test_corruptions_string,
                                         columns=train_corruptions_string)
-        avg_report_frame.to_csv(f'{self.results_folder}_metrics_test_avg.csv', index=True, header=True,
+        avg_report_frame.to_csv(os.path.abspath(f'{self.results_folder}_metrics_test_avg.csv'), index=True, header=True,
                                 sep=';', float_format='%1.4f', decimal=',')
         if self.runs >= 2:
             max_report_frame = pd.DataFrame(self.max_test_metrics, index=test_corruptions_string,
@@ -429,10 +430,10 @@ class TestTracking:
             std_report_frame = pd.DataFrame(self.std_test_metrics, index=test_corruptions_string,
                                             columns=train_corruptions_string)
             max_report_frame.to_csv(
-                f'{self.results_folder}_metrics_test_max.csv', index=True, header=True,
+                os.path.abspath(f'{self.results_folder}_metrics_test_max.csv'), index=True, header=True,
                 sep=';', float_format='%1.4f', decimal=',')
             std_report_frame.to_csv(
-                f'{self.results_folder}_metrics_test_std.csv', index=True, header=True,
+                os.path.abspath(f'{self.results_folder}_metrics_test_std.csv'), index=True, header=True,
                 sep=';', float_format='%1.4f', decimal=',')
 
     def initialize(self, run, model):
@@ -448,8 +449,8 @@ class TestTracking:
             print(f"Run {run}, evaluating model trained on noise of type:", train_corruption)
             self.fileaddition = f'_{train_corruption["noise_type"]}_eps_{train_corruption["epsilon"]}_' \
                            f'{train_corruption["sphere"]}_'
-        self.filename = f'./experiments/trained_models/{self.dataset}/{self.modeltype}/config{self.experiment}' \
-                   f'{self.fileaddition}run_{run}.pth'
+        self.filename = os.path.abspath(f'./experiments/trained_models/{self.dataset}/{self.modeltype}/config{self.experiment}' \
+                   f'{self.fileaddition}run_{run}.pth')
 
     def track_results(self, new_results):
         for element in new_results:
@@ -501,13 +502,13 @@ class TestTracking:
                 plt.legend()
                 plt.close()
 
-                adv_fig.savefig(f'results/{self.dataset}/{self.modeltype}/config{self.experiment}{self.fileaddition}run'
-                                f'_{self.run}_adversarial_distances_{n}-norm_{samples}-CLEVER-samples.svg')
+                adv_fig.savefig(os.path.abspath(f'results/{self.dataset}/{self.modeltype}/config{self.experiment}{self.fileaddition}run'
+                                f'_{self.run}_adversarial_distances_{n}-norm_{samples}-CLEVER-samples.svg'))
                 adv_distance_frame.iloc[:, col_counter] = dist_sorted[:,len(adv_distance_params["norm"])*3+id*
                                                                      len(adv_distance_params["clever_batches"]) + j]
                 col_counter += 1
 
-        adv_distance_frame.to_csv(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}{self.fileaddition}'
-                                  f'run_{self.run}_adversarial_distances.csv',
+        adv_distance_frame.to_csv(os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}{self.fileaddition}'
+                                  f'run_{self.run}_adversarial_distances.csv'),
                                   index=False, header=True, sep=';', float_format='%1.4f', decimal=',')
 

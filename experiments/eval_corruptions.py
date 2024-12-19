@@ -29,7 +29,7 @@ def compute_p_corruptions(testloader, model, test_corruptions, dataset):
             inputs_pert = apply_noise(inputs, 8, test_corruptions, 1, False, dataset)
             #plot_images(inputs_pert, inputs_pert, 3)
 
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast('cuda'):
                 targets_pred = model(inputs_pert)
 
             _, predicted = targets_pred.max(1)
@@ -78,7 +78,7 @@ def compute_c(loader_c, model, num_classes):
 
         for batch_idx, (inputs, targets) in enumerate(loader_c):
             inputs, targets = inputs.to(device, dtype=torch.float), targets.to(device)
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast('cuda'):
                 targets_pred = model(inputs)
 
             _, predicted = targets_pred.max(1)

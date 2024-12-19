@@ -77,7 +77,7 @@ def compute_clean(testloader, model, num_classes):
         for batch_idx, (inputs, targets) in enumerate(testloader):
 
             inputs, targets = inputs.to(device, dtype=torch.float), targets.to(device)
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast('cuda'):
                 targets_pred = model(inputs)
 
             _, predicted = targets_pred.max(1)
@@ -118,7 +118,7 @@ if __name__ == '__main__':
             else:
                 model_class = getattr(torchmodels, args.modeltype)
                 model = model_class(num_classes=Dataloader.num_classes, **args.modelparams)
-            model = torch.nn.DataParallel(model).to(device)
+            model = model.to(device) #torch.nn.DataParallel(
             cudnn.benchmark = True
             model.load_state_dict(torch.load(Testtracker.filename)['model_state_dict'], strict=False)
 
