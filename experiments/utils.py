@@ -101,7 +101,7 @@ class Checkpoint:
 
     def __init__(self, combine_train_corruptions, dataset, modeltype, experiment, train_corruption, run,
                  earlystopping=False, patience=7, verbose=False, delta=0, trace_func=print,
-                 checkpoint_path=f'experiments/trained_models/checkpoint.pt',
+                 checkpoint_path=f'../trained_models/checkpoint.pt',
                  ):
         """
         Args:
@@ -126,9 +126,9 @@ class Checkpoint:
         self.early_stopping = earlystopping
         self.checkpoint_path = os.path.abspath(checkpoint_path)
         if combine_train_corruptions:
-            self.final_model_path = os.path.abspath(f'./experiments/trained_models/{dataset}/{modeltype}/config{experiment}_run_{run}.pth')
+            self.final_model_path = os.path.abspath(f'../trained_models/{dataset}/{modeltype}/config{experiment}_run_{run}.pth')
         else:
-            self.final_model_path = os.path.abspath(f'./experiments/trained_models/{dataset}/{modeltype}/config{experiment}_' \
+            self.final_model_path = os.path.abspath(f'../trained_models/{dataset}/{modeltype}/config{experiment}_' \
                     f'{train_corruption["noise_type"]}_eps_{train_corruption["epsilon"]}_{train_corruption["sphere"]}_run_{run}.pth')
 
 
@@ -449,7 +449,7 @@ class TestTracking:
             print(f"Run {run}, evaluating model trained on noise of type:", train_corruption)
             self.fileaddition = f'_{train_corruption["noise_type"]}_eps_{train_corruption["epsilon"]}_' \
                            f'{train_corruption["sphere"]}_'
-        self.filename = os.path.abspath(f'./experiments/trained_models/{self.dataset}/{self.modeltype}/config{self.experiment}' \
+        self.filename = os.path.abspath(f'../trained_models/{self.dataset}/{self.modeltype}/config{self.experiment}' \
                    f'{self.fileaddition}run_{run}.pth')
 
     def track_results(self, new_results):

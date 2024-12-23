@@ -29,6 +29,11 @@
 		  "type": "bind",
 		  "source": "/home/siedel/data",
 		  "target": "/workspaces/data"
+		},
+		{
+			"type": "bind",
+			"source": "/home/siedel/trained_models",
+			"target": "/workspaces/trained_models"
 		}
 	  ]
 }

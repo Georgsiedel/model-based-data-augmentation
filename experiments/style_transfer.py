@@ -18,6 +18,7 @@ import adaIN.model as adaINmodel
 import adaIN.utils as utils
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+nst_device = torch.device('cuda' if torch.cuda.device_count() >= 2 else 'cuda')
 encoder_rel_path = 'adaIN/vgg_normalised.pth'
 decoder_rel_path = 'adaIN/decoder.pth'
 style_feats_rel_path = '../../data/style_feats_adain_1000.npy'
@@ -33,8 +34,8 @@ def load_models():
     vgg = nn.Sequential(*list(vgg.children())[:31])
     decoder.load_state_dict(torch.load(decoder_path, weights_only=True))
 
-    vgg.to(device)
-    decoder.to(device)
+    vgg.to(nst_device)
+    decoder.to(nst_device)
 
     vgg.eval()
     decoder.eval()
@@ -44,7 +45,7 @@ def load_feat_files():
 
     style_feats_np = np.load(style_feats_path)
     style_feats_tensor = torch.from_numpy(style_feats_np)
-    style_feats_tensor = style_feats_tensor.to(device)
+    style_feats_tensor = style_feats_tensor.to(nst_device)
     return style_feats_tensor
 
 class NSTTransform(transforms.Transform):
@@ -80,13 +81,13 @@ class NSTTransform(transforms.Transform):
     @torch.no_grad()
     def __call__(self, x):
 
-        #x = x.to(device)
-        if x.size(0) == 0:
-            return x
+        x = x.to(nst_device)
 
         x = self.upsample(x)
         ratio = int(math.floor(x.size(0)*self.probability + random.random()))
-
+        if ratio == 0:
+            return x.to(device)
+        
         idx = torch.randperm(self.num_styles)[0:ratio]
         idy = torch.randperm(x.size(0))[0:ratio]
         x[idy] = self.style_transfer(self.vgg, self.decoder, x[idy], self.style_features[idx])
@@ -101,7 +102,7 @@ class NSTTransform(transforms.Transform):
 
         #stl_imgs = [self.to_pil_img(image) for image in stl_imgs]
 
-        return stl_imgs #, stylized
+        return stl_imgs.to(device) #, stylized
 
     @torch.no_grad()
     def norm_style_tensor(self, tensor):

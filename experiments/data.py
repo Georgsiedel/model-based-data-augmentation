@@ -1,5 +1,6 @@
 import random
 import os
+import time
 
 import torch
 from PIL import Image
@@ -104,11 +105,10 @@ class BalancedRatioSampler(Sampler):
 class AugmentedDataset(torch.utils.data.Dataset):
     """Dataset wrapper to perform augmentations and allow robust loss functions."""
 
-    def __init__(self, images, labels, sources, transforms_preprocess, transforms_basic, transforms_orig_cpu, 
+    def __init__(self, original_dataset, generated_dataset, transforms_preprocess, transforms_basic, transforms_orig_cpu, 
                 transforms_orig_gpu, transforms_gen_cpu, transforms_gen_gpu, robust_samples=0):
-        self.images = images
-        self.labels = labels
-        self.sources = sources
+        self.original_dataset = original_dataset
+        self.generated_dataset = generated_dataset
         self.preprocess = transforms_preprocess
         self.transforms_basic = transforms_basic
         self.transforms_orig_cpu = transforms_orig_cpu
@@ -117,9 +117,20 @@ class AugmentedDataset(torch.utils.data.Dataset):
         self.transforms_gen_gpu = transforms_gen_gpu
         self.robust_samples = robust_samples
 
-    def __getitem__(self, i):
-        x = self.images[i]
-        source = self.sources[i]
+        self.num_original = len(original_dataset) if original_dataset else 0
+        self.num_generated = len(generated_dataset['images']) if generated_dataset else 0
+        self.total_size = self.num_original + self.num_generated
+
+    def __getitem__(self, idx):
+        if idx < self.num_original:
+            x, y = self.original_dataset[idx]
+            source = True  # Mark as original
+        else:
+            # Select data from the generated dataset
+            gen_idx = idx - self.num_original
+            x = Image.fromarray(self.generated_dataset['images'][gen_idx])
+            y = self.generated_dataset['labels'][gen_idx]
+            source = False
         
         if source:
             aug = self.transforms_orig_cpu
@@ -133,30 +144,30 @@ class AugmentedDataset(torch.utils.data.Dataset):
         if check_gpu is not None:
             if self.robust_samples == 0:
                 x, apply_gpu_transform = augment(x)
-                return x, self.labels[i], source, apply_gpu_transform
+                return x, y, source, apply_gpu_transform
             elif self.robust_samples == 1:
                 x1, apply_gpu_transform1 = augment(x)
                 x_tuple = (self.preprocess(x), x1)
                 apply_tuple = (False, apply_gpu_transform1)
-                return x_tuple, self.labels[i], source, apply_tuple
+                return x_tuple, y, source, apply_tuple
             elif self.robust_samples == 2:
                 x1, apply_gpu_transform1 = augment(x)
                 x2, apply_gpu_transform2 = augment(x)
                 x_tuple = (self.preprocess(x), x1, x2)
                 apply_tuple = (False, apply_gpu_transform1, apply_gpu_transform2)
-                return x_tuple, self.labels[i], source, apply_tuple
+                return x_tuple, y, source, apply_tuple
         else:
             if self.robust_samples == 0:
-                return augment(x), self.labels[i], source, False
+                return augment(x), y, source, False
             elif self.robust_samples == 1:
                 x_tuple = (self.preprocess(x), augment(x))
-                return x_tuple, self.labels[i], source, (False, False)
+                return x_tuple, y, source, (False, False)
             elif self.robust_samples == 2:
                 x_tuple = (self.preprocess(x), augment(x), augment(x))
-                return x_tuple, self.labels[i], source, (False, False, False)
+                return x_tuple, y, source, (False, False, False)
 
     def __len__(self):
-        return len(self.labels)
+        return self.total_size
 
 class RandomChoiceTransforms:
     def __init__(self, transforms, p):
@@ -434,70 +445,25 @@ class DataLoading():
         np.random.seed(self.epoch + self.epochs * self.run)
         random.seed(self.epoch + self.epochs * self.run)
 
-        # Prepare lists for combined data
-        sources = [None] * self.target_size
-        stylized = [None] * self.target_size
+        self.num_generated = int(target_size * self.generated_ratio)
+        self.num_original = target_size - self.num_generated
 
-        if self.generated_dataset == None or self.generated_ratio == 0.0:
-            self.num_generated = 0
-            self.num_original = self.target_size
-            generated_images, generated_labels = [], []
-            print(self.base_trainset)
-            original_images, original_labels = map(list, zip(*self.base_trainset))
-            print('done')
-            if isinstance(original_images[0], torch.Tensor):
-                original_images = TF.to_pil_image(original_images)
-            sources = [True] * len(self.base_trainset)
-
+        if self.num_original > 0:
+            original_indices = torch.randperm(len(self.base_trainset))[:self.num_original]
+            original_subset = Subset(self.base_trainset, original_indices)
         else:
-            self.num_generated = int(self.target_size * self.generated_ratio)
-            self.num_original = self.target_size - self.num_generated
+            original_subset = None
 
-            # Create a single permutation for the whole epoch
-            original_perm = torch.randperm(len(self.base_trainset))
-            generated_perm = torch.randperm(len(self.generated_dataset['image']))
+        if self.num_generated > 0 and self.generated_dataset is not None:
+            generated_indices = torch.randperm(len(self.generated_dataset['image']))[:self.num_generated]
+            generated_subset = {
+                'images': self.generated_dataset['image'][generated_indices],
+                'labels': self.generated_dataset['label'][generated_indices]
+            }
+        else:
+            generated_subset = None
 
-            original_indices = original_perm[0:self.num_original]
-            generated_indices = generated_perm[0:self.num_generated]
-            generated_images = list(map(Image.fromarray, self.generated_dataset['image'][generated_indices]))
-            generated_labels = list(self.generated_dataset['label'][generated_indices])
-
-            original_subset = Subset(dataset=self.base_trainset, indices=original_indices) # type: ignore
-            original_images, original_labels = map(list, zip(*original_subset))
-            if isinstance(original_images[0], torch.Tensor):
-                original_images = TF.to_pil_image(original_images)
-
-            sources[:self.num_original] = [True] * self.num_original
-            sources[self.num_original:self.target_size] = [False] * self.num_generated
-
-        #Here we do mixing as a GPU transform
-        #batch_size = 100
-
-        # Process original images
-        #if self.transforms_orig_gpu is None:
-        #    stylized[:self.num_original] = [False] * self.num_original  # All original images are untransformed
-        #else:
-        #    # Process original images in batches if transform is provided
-        #    for i in range(0, self.num_original, batch_size):
-        #        batch = original_images[i:min(i + batch_size, self.num_original)]
-        #        batch = torch.stack([self.transforms_preprocess(image) for image in batch])
-        #        batch, batch_stylized = self.transforms_orig_gpu(batch)
-        #        original_images[i:min(i + batch_size, self.num_original)] = batch
-        #        stylized[i:min(i + batch_size, self.num_original)] = batch_stylized
-#
-#        # Process generated images
-#        if self.transforms_gen_gpu is None or self.generated_dataset == None or self.generated_ratio == 0.0:
-#            stylized[self.num_original:self.target_size] = [False] * self.num_generated  # All original images are untransformed
-#        else:
-#            # Process generated images in batches if transform is provided
-#            for i in range(0, self.num_generated, batch_size):
-#                batch = generated_images[i:min(i + batch_size, self.num_generated)]
-#                batch = torch.stack([self.transforms_preprocess(image) for image in batch])
-#                batch, batch_stylized = self.transforms_gen_gpu(batch)
-#                generated_images[i:min(i + batch_size, self.num_generated)] = batch
-#                stylized[i:min(i + batch_size, self.num_generated)] = batch_stylized
-        print(type(original_images), type(generated_images))
-        self.trainset = AugmentedDataset(original_images + generated_images, original_labels + generated_labels, sources,
+        self.trainset = AugmentedDataset(original_subset, generated_subset,
                                         self.transforms_preprocess, self.transforms_basic, self.transforms_orig_cpu, 
                                         self.transforms_orig_gpu, self.transforms_gen_cpu, self.transforms_gen_gpu, self.robust_samples)
 

@@ -265,7 +265,7 @@ if __name__ == '__main__':
     Scaler = torch.amp.GradScaler(device=device)
     Checkpointer = utils.Checkpoint(args.combine_train_corruptions, args.dataset, args.modeltype, args.experiment,
                                     train_corruptions, args.run, earlystopping=args.earlystop, patience=args.earlystopPatience,
-                                    verbose=False,  checkpoint_path=f'experiments/trained_models/checkpoint_{args.experiment}.pt')
+                                    verbose=False,  checkpoint_path=f'../trained_models/checkpoint_{args.experiment}.pt')
     Traintracker = utils.TrainTracking(args.dataset, args.modeltype, args.lrschedule, args.experiment, args.run,
                             args.validonc, args.validonadv, args.swa)
 
