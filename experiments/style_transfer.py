@@ -1,6 +1,7 @@
 import os
 import sys
 import numpy as np
+from experiments.utils import plot_images
 
 current_dir = os.path.dirname(__file__)
 module_path = os.path.abspath(current_dir)
@@ -17,8 +18,16 @@ import torchvision.transforms.v2 as transforms
 import adaIN.model as adaINmodel
 import adaIN.utils as utils
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-nst_device = torch.device('cuda' if torch.cuda.device_count() >= 2 else 'cuda')
+if torch.cuda.is_available():
+    device = torch.device('cuda')
+    if torch.cuda.device_count() >= 2:
+        nst_device = torch.device('cuda:1')
+    else:
+        nst_device = torch.device('cuda')
+else:
+    device = torch.device('cpu')
+    nst_device = torch.device('cpu')
+
 encoder_rel_path = 'adaIN/vgg_normalised.pth'
 decoder_rel_path = 'adaIN/decoder.pth'
 style_feats_rel_path = '../../data/style_feats_adain_1000.npy'
@@ -70,7 +79,7 @@ class NSTTransform(transforms.Transform):
         self.decoder = decoder
         self.alpha_min = alpha_min
         self.alpha_max = alpha_max
-        self.upsample = nn.Upsample(size=(pixels, pixels), mode='bilinear', align_corners=False)
+        self.upsample = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
         self.downsample = nn.Upsample(size=(pixels, pixels), mode='bilinear', align_corners=False)
         self.to_tensor = transforms.Compose([transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True)])
         self.style_features = style_feats
@@ -88,9 +97,9 @@ class NSTTransform(transforms.Transform):
         if ratio == 0:
             return x.to(device)
         
-        idx = torch.randperm(self.num_styles)[0:ratio]
-        idy = torch.randperm(x.size(0))[0:ratio]
-        x[idy] = self.style_transfer(self.vgg, self.decoder, x[idy], self.style_features[idx])
+        idy = torch.randperm(self.num_styles)[0:ratio]
+        idx = torch.randperm(x.size(0))[0:ratio]
+        x[idx] = self.style_transfer(self.vgg, self.decoder, x[idx], self.style_features[idy])
 
         stl_imgs = self.downsample(x)
         #stl_imgs = stl_imgs.detach().cpu()
@@ -118,11 +127,12 @@ class NSTTransform(transforms.Transform):
     def style_transfer(self, vgg, decoder, content, style):
 
         alpha = np.random.uniform(low=self.alpha_min, high=self.alpha_max)
-
+        
         content_f = vgg(content)
         style_f = style
         feat = utils.adaptive_instance_normalization(content_f, style_f)
 
         feat = feat * alpha + content_f * (1 - alpha)
         feat = decoder(feat)
+
         return feat

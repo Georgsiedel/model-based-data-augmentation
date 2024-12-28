@@ -15,7 +15,7 @@ if __name__ == '__main__':
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
         runs = 1
         
-        if experiment in [12]:
+        if experiment in []:
             resume = True
         else:
             resume = False
@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
-        if experiment in [12]:
+        if experiment in []:
             print('Beginning metric evaluation')
             cmdeval = "python experiments/eval.py --resume={} --experiment={} --runs={} --batchsize={} --dataset={} " \
                     "--modeltype={} --modelparams=\"{}\" --resize={} --combine_test_corruptions={} --number_workers={} " \

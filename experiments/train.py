@@ -18,6 +18,7 @@ import torch.optim as optim
 from torch.optim.swa_utils import AveragedModel, SWALR
 import torchvision.models as torchmodels
 import torchvision.transforms.v2 as transforms
+from experiments.utils import plot_images
 
 import data
 import utils
@@ -140,7 +141,9 @@ def train_epoch(pbar):
         if criterion.robust_samples >= 1:
             inputs = torch.cat((inputs[0], Dataloader.transforms_gpu(torch.cat(inputs[1:], 0), sources, apply_gpu_transform[1:])), 0)
         else:
-            inputs = Dataloader.transforms_gpu(inputs, sources, apply_gpu_transform)
+            inputs_orig = inputs.clone()
+            inputs = Dataloader.transforms_orig_gpu(inputs)
+            #plot_images(inputs_orig, inputs, 4, 0.0, 1.0)
         
         inputs, targets = inputs.to(device, dtype=torch.float32), targets.to(device)
         with torch.amp.autocast(device_type=device):

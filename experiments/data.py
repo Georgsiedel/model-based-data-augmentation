@@ -315,7 +315,7 @@ class DataLoading():
                                                         "before_no_stylization": EmptyTransforms()}, 
                                                         probabilities={"before_stylization_probability": 1.0, 
                                                         "before_no_stylization_probability": 0.0}),
-                                stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0),
+                                stylization(probability=0.95, alpha_min=0.0, alpha_max=0.0),
                               re),
             "TAorStyle0.75": (StylizedChoiceTransforms(transforms={"before_stylization": EmptyTransforms(), 
                                                         "before_no_stylization": transforms.Compose([transforms_v2.TrivialAugmentWide(), re])}, 

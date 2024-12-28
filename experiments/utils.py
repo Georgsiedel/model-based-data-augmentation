@@ -34,21 +34,34 @@ class str2dictAction(argparse.Action):
 
 
 
+import matplotlib.pyplot as plt
+import torch
+
 def plot_images(images, corrupted_images, number, mean, std):
     images = images * std + mean
     corrupted_images = corrupted_images * std + mean
-    fig, axs = plt.subplots(number, 2)
+    
+    # Define a consistent figure size for each row of images
+    row_height = 1.5  # Height per row
+    col_width = 1.5   # Width per column
+    fig, axs = plt.subplots(number, 2, figsize=(2 * col_width, number * row_height), squeeze=False)
+    
     images, corrupted_images = images.cpu(), corrupted_images.cpu()
+    
     for i in range(number):
         image = images[i]
         image = torch.squeeze(image)
         image = image.permute(1, 2, 0)
         axs[i, 0].imshow(image)
+        axs[i, 0].axis('off')  # Turn off axes for cleaner visualization
+        
         corrupted_image = corrupted_images[i]
         corrupted_image = torch.squeeze(corrupted_image)
         corrupted_image = corrupted_image.permute(1, 2, 0)
         axs[i, 1].imshow(corrupted_image)
-    #return fig
+        axs[i, 1].axis('off')  # Turn off axes for cleaner visualization
+
+    plt.tight_layout()  # Adjust layout to prevent overlapping
     plt.show()
 
 def calculate_steps(dataset, batchsize, epochs, start_epoch, warmupepochs, validontest, validonc, swa, swa_start_factor):
