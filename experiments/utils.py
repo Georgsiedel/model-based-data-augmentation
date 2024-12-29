@@ -166,7 +166,7 @@ class Checkpoint:
             self.best_model = True
 
     def load_model(self, model, swa_model, optimizer, scheduler, swa_scheduler, type='standard'):
-        checkpoint = torch.load(self.checkpoint_path)
+        checkpoint = torch.load(self.checkpoint_path, weights_only=False)
         if type == 'standard':
             model.load_state_dict(checkpoint['model_state_dict'], strict=True)
             start_epoch = checkpoint['epoch'] + 1
@@ -203,7 +203,7 @@ class Checkpoint:
             }, self.checkpoint_path)
 
         else:
-            checkpoint = torch.load(self.checkpoint_path)
+            checkpoint = torch.load(self.checkpoint_path, weights_only=False)
             checkpoint['epoch'] = epoch
             checkpoint['model_state_dict'] = model.state_dict()
             checkpoint['optimizer_state_dict'] = optimizer.state_dict()

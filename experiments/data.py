@@ -315,7 +315,7 @@ class DataLoading():
                                                         "before_no_stylization": EmptyTransforms()}, 
                                                         probabilities={"before_stylization_probability": 1.0, 
                                                         "before_no_stylization_probability": 0.0}),
-                                stylization(probability=0.95, alpha_min=0.0, alpha_max=0.0),
+                                stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0),
                               re),
             "TAorStyle0.75": (StylizedChoiceTransforms(transforms={"before_stylization": EmptyTransforms(), 
                                                         "before_no_stylization": transforms.Compose([transforms_v2.TrivialAugmentWide(), re])}, 
@@ -564,9 +564,9 @@ class GPU_Transforms():
         
         orig_mask = (sources) & (apply)
         if orig_mask.any():
-            if apply[sources].sum().item() > 150:
+            if apply[sources].sum().item() > 200:
                 #split the batch into chunks if the number of images to be stylized is more than 180 cause VRAM
-                chunks = torch.split(x[orig_mask], 150)
+                chunks = torch.split(x[orig_mask], 200)
                 processed_chunks = [self.transforms_orig_gpu(chunk) for chunk in chunks]
                 x[orig_mask] = torch.cat(processed_chunks, dim=0)
             else:
@@ -574,9 +574,9 @@ class GPU_Transforms():
         
         gen_mask = (~sources) & (apply)
         if gen_mask.any():
-            if apply[~sources].sum().item() > 150:
+            if apply[~sources].sum().item() > 200:
                 #split the batch into chunks if the number of images to be stylized is more than 180 cause VRAM
-                chunks = torch.split(x[gen_mask], 150)
+                chunks = torch.split(x[gen_mask], 200)
                 processed_chunks = [self.transforms_gen_gpu(chunk) for chunk in chunks]
                 x[gen_mask] = torch.cat(processed_chunks, dim=0)
             else:

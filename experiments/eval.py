@@ -120,7 +120,19 @@ if __name__ == '__main__':
                 model = model_class(num_classes=Dataloader.num_classes, **args.modelparams)
             model = model.to(device) #torch.nn.DataParallel(
             cudnn.benchmark = True
-            model.load_state_dict(torch.load(Testtracker.filename)['model_state_dict'], strict=False)
+            #model.load_state_dict(torch.load(Testtracker.filename)['model_state_dict'], strict=True)
+
+            state_dict = torch.load(Testtracker.filename, weights_only=True)['model_state_dict']
+
+            # Remove "module." prefix from keys
+            from collections import OrderedDict
+            new_state_dict = OrderedDict()
+            for k, v in state_dict.items():
+                new_key = k.replace("module.", "")  # Remove "module." prefix
+                new_state_dict[new_key] = v
+
+            # Load the modified state_dict into the original model
+            model.load_state_dict(new_state_dict, strict=False)
 
             model.eval()
 

@@ -21,7 +21,7 @@ import adaIN.utils as utils
 if torch.cuda.is_available():
     device = torch.device('cuda')
     if torch.cuda.device_count() >= 2:
-        nst_device = torch.device('cuda:1')
+        nst_device = torch.device('cuda') #'cuda:1'
     else:
         nst_device = torch.device('cuda')
 else:
@@ -95,7 +95,7 @@ class NSTTransform(transforms.Transform):
         x = self.upsample(x)
         ratio = int(math.floor(x.size(0)*self.probability + random.random()))
         if ratio == 0:
-            return x.to(device)
+            return self.downsample(x).to(device)
         
         idy = torch.randperm(self.num_styles)[0:ratio]
         idx = torch.randperm(x.size(0))[0:ratio]
