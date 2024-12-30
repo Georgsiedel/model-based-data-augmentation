@@ -246,11 +246,9 @@ class DataLoading():
         r256 = transforms.Resize(256, antialias=True)
         c224 = transforms.CenterCrop(224)
         rrc224 = transforms.RandomResizedCrop(224, antialias=True)
-        re = transforms.RandomErasing(p=RandomEraseProbability, scale=(0.02, 0.4), value='random')
+        re = transforms.RandomErasing(p=RandomEraseProbability, scale=(0.02, 0.4)) #, value='random' --> normally distributed and out of bounds 0-1
         TAc = CustomTA_color()
         TAg = CustomTA_geometric()
-
-        self.stylization_prob = 0.0
 
         def stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0):
             vgg, decoder = style_transfer.load_models()
