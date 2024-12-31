@@ -135,13 +135,11 @@ def train_epoch(pbar):
 
     model.train()
     correct, total, train_loss, avg_train_loss = 0, 0, 0, 0
-    for batch_idx, (inputs, targets, sources, apply_gpu_transform) in enumerate(trainloader):
+    for batch_idx, (inputs, targets) in enumerate(trainloader):
 
         optimizer.zero_grad()
         if criterion.robust_samples >= 1:
-            inputs = torch.cat((inputs[0], Dataloader.transforms_gpu(torch.cat(inputs[1:], 0), sources, apply_gpu_transform[1:])), 0)
-        else:
-            inputs = Dataloader.transforms_gpu(inputs, sources, apply_gpu_transform)
+            inputs = torch.cat(inputs, 0)
         
         inputs, targets = inputs.to(device, dtype=torch.float32), targets.to(device)
         with torch.amp.autocast(device_type=device):

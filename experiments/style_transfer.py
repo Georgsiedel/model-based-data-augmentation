@@ -90,28 +90,32 @@ class NSTTransform(transforms.Transform):
     @torch.no_grad()
     def __call__(self, x):
 
-        x = x.to(nst_device)
+        single_image = True if x.ndimension() == 3 else False
 
-        x = self.upsample(x)
-        ratio = int(math.floor(x.size(0)*self.probability + random.random()))
+        batchsize = 1 if single_image else x.size(0)
+        ratio = int(math.floor(batchsize*self.probability + random.random()))
         if ratio == 0:
-            return self.downsample(x).to(device)
+            return x
         
+        x = x.to(nst_device)
+        
+        if single_image:
+            x = x.unsqueeze(0)
+        
+        x = self.upsample(x)
+
         idy = torch.randperm(self.num_styles)[0:ratio]
         idx = torch.randperm(x.size(0))[0:ratio]
         x[idx] = self.style_transfer(self.vgg, self.decoder, x[idx], self.style_features[idy])
 
         stl_imgs = self.downsample(x)
-        #stl_imgs = stl_imgs.detach().cpu()
-        
-        # Create a boolean mask: True if image stylized, False if not
-        #stylized = torch.isin(torch.arange(stl_imgs.size(0)), idy)
 
         stl_imgs = self.norm_style_tensor(stl_imgs)
 
-        #stl_imgs = [self.to_pil_img(image) for image in stl_imgs]
+        if single_image:
+            stl_imgs = stl_imgs.squeeze(0)
 
-        return stl_imgs.to(device) #, stylized
+        return stl_imgs.detach().cpu()
 
     @torch.no_grad()
     def norm_style_tensor(self, tensor):

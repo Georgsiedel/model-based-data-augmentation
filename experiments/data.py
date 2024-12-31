@@ -105,16 +105,14 @@ class BalancedRatioSampler(Sampler):
 class AugmentedDataset(torch.utils.data.Dataset):
     """Dataset wrapper to perform augmentations and allow robust loss functions."""
 
-    def __init__(self, original_dataset, generated_dataset, transforms_preprocess, transforms_basic, transforms_orig_cpu, 
-                transforms_orig_gpu, transforms_gen_cpu, transforms_gen_gpu, robust_samples=0):
+    def __init__(self, original_dataset, generated_dataset, transforms_preprocess, transforms_basic, 
+                 transforms_orig, transforms_gen, robust_samples=0):
         self.original_dataset = original_dataset
         self.generated_dataset = generated_dataset
         self.preprocess = transforms_preprocess
         self.transforms_basic = transforms_basic
-        self.transforms_orig_cpu = transforms_orig_cpu
-        self.transforms_orig_gpu = transforms_orig_gpu
-        self.transforms_gen_cpu = transforms_gen_cpu
-        self.transforms_gen_gpu = transforms_gen_gpu
+        self.transforms_orig = transforms_orig
+        self.transforms_gen = transforms_gen
         self.robust_samples = robust_samples
 
         self.num_original = len(original_dataset) if original_dataset else 0
@@ -124,47 +122,28 @@ class AugmentedDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         if idx < self.num_original:
             x, y = self.original_dataset[idx]
-            source = True  # Mark as original
+            aug = self.transforms_orig
         else:
             # Select data from the generated dataset
             gen_idx = idx - self.num_original
             x = Image.fromarray(self.generated_dataset['images'][gen_idx])
             y = self.generated_dataset['labels'][gen_idx]
-            source = False
-        
-        if source:
-            aug = self.transforms_orig_cpu
-            check_gpu = self.transforms_orig_gpu
-        else:
-            aug = self.transforms_gen_cpu
-            check_gpu = self.transforms_gen_gpu
+            aug = self.transforms_gen
 
-        augment = transforms.Compose([self.transforms_basic, self.preprocess, aug])
+        augment = transforms.Compose([self.preprocess, self.transforms_basic, aug])
 
-        if check_gpu is not None:
-            if self.robust_samples == 0:
-                x, apply_gpu_transform = augment(x)
-                return x, y, source, apply_gpu_transform
-            elif self.robust_samples == 1:
-                x1, apply_gpu_transform1 = augment(x)
-                x_tuple = (self.preprocess(x), x1)
-                apply_tuple = (False, apply_gpu_transform1)
-                return x_tuple, y, source, apply_tuple
-            elif self.robust_samples == 2:
-                x1, apply_gpu_transform1 = augment(x)
-                x2, apply_gpu_transform2 = augment(x)
-                x_tuple = (self.preprocess(x), x1, x2)
-                apply_tuple = (False, apply_gpu_transform1, apply_gpu_transform2)
-                return x_tuple, y, source, apply_tuple
-        else:
-            if self.robust_samples == 0:
-                return augment(x), y, source, False
-            elif self.robust_samples == 1:
-                x_tuple = (self.preprocess(x), augment(x))
-                return x_tuple, y, source, (False, False)
-            elif self.robust_samples == 2:
-                x_tuple = (self.preprocess(x), augment(x), augment(x))
-                return x_tuple, y, source, (False, False, False)
+        if self.robust_samples == 0:
+            x = augment(x)
+            return x, y
+        elif self.robust_samples == 1:
+            x1 = augment(x)
+            x_tuple = (self.preprocess(x), x1)
+            return x_tuple, y
+        elif self.robust_samples == 2:
+            x1 = augment(x)
+            x2 = augment(x)
+            x_tuple = (self.preprocess(x), x1, x2)
+            return x_tuple, y
 
     def __len__(self):
         return self.total_size
@@ -321,12 +300,7 @@ class DataLoading():
                                                         "before_no_stylization_probability": 0.25}),
                                 stylization(probability=0.95),
                                 re),
-            "TAorStyle0.5": (StylizedChoiceTransforms(transforms={"before_stylization": EmptyTransforms(), 
-                                                        "before_no_stylization": transforms.Compose([transforms_v2.TrivialAugmentWide(), re])}, 
-                                                        probabilities={"before_stylization_probability": 0.5, 
-                                                        "before_no_stylization_probability": 0.5}),
-                                stylization(probability=0.95),
-                                re),
+            "TAorStyle0.5": transforms.Compose([RandomChoiceTransforms((transforms_v2.TrivialAugmentWide(), stylization(probability=0.95)), (0.5, 0.5)), re]),
             "TAorStyle0.25": (StylizedChoiceTransforms(transforms={"before_stylization": EmptyTransforms(), 
                                                         "before_no_stylization": transforms.Compose([transforms_v2.TrivialAugmentWide(), re])}, 
                                                         probabilities={"before_stylization_probability": 0.25, 
@@ -374,16 +348,15 @@ class DataLoading():
                      None),
         }
 
-        self.transforms_orig_cpu, self.transforms_orig_gpu, self.transforms_orig_post = (transform_map[train_aug_strat_orig]
+        self.transforms_orig = (transform_map[train_aug_strat_orig]
             if train_aug_strat_orig in transform_map
             else transform_not_found(train_aug_strat_orig, 'transforms_original'))
 
-        self.transforms_gen_cpu, self.transforms_gen_gpu, self.transforms_gen_post  = (transform_map[train_aug_strat_gen]
+        self.transforms_gen = (transform_map[train_aug_strat_gen]
                                         if train_aug_strat_gen in transform_map
                                         else transform_not_found(train_aug_strat_gen, 'transforms_generated'))
         
-        self.transforms_gpu = GPU_Transforms(self.transforms_orig_gpu, self.transforms_orig_post, self.transforms_gen_gpu, self.transforms_gen_post)
-
+        #self.transforms_gpu = GPU_Transforms(self.transforms_orig_gpu, self.transforms_orig_post, self.transforms_gen_gpu, self.transforms_gen_post)
 
     def load_base_data(self, validontest, run=0):
 
@@ -461,9 +434,8 @@ class DataLoading():
         else:
             generated_subset = None
 
-        self.trainset = AugmentedDataset(original_subset, generated_subset,
-                                        self.transforms_preprocess, self.transforms_basic, self.transforms_orig_cpu, 
-                                        self.transforms_orig_gpu, self.transforms_gen_cpu, self.transforms_gen_gpu, self.robust_samples)
+        self.trainset = AugmentedDataset(original_subset, generated_subset, self.transforms_preprocess, 
+                                         self.transforms_basic, self.transforms_orig, self.transforms_gen, self.robust_samples)
 
     def load_data_c(self, subset, subsetsize):
 
