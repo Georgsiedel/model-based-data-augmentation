@@ -1,0 +1,263 @@
+import random
+import torch
+import torch.cuda.amp
+import torch.utils
+import torch.utils.data
+import torchvision.transforms.v2 as transforms_v2
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+import torch
+from torchvision.transforms import ToTensor, ToPILImage
+import numpy as np
+
+class DatasetStyleTransforms:
+    def __init__(self, stylized_ratio, batch_size, transform_style):
+        """
+        Initializes the DatasetStyleTransformer.
+
+        Args:
+            stylized_ratio: Ratio of images to stylize.
+            batch_size: Batch size for applying transformations.
+            transform_style: Transformation to apply.
+        """
+        self.stylized_ratio = stylized_ratio
+        self.batch_size = batch_size
+        self.transform_style = transform_style
+
+    def __call__(self, dataset):
+        """
+        Transforms a dataset by applying style transformations to a specified ratio of images.
+
+        Args:
+            dataset: Dictionary with 'images' and 'labels' (numpy-style) or PyTorch Subset.
+
+        Returns:
+            updated_dataset: Updated dataset with stylized images.
+            transformed_flags: Boolean list indicating which images were transformed.
+        """
+        if isinstance(dataset, torch.utils.data.Subset):
+            # Handle PyTorch Subset
+            images = [ToTensor()(dataset.dataset[i][0]) for i in dataset.indices]
+            labels = [dataset.dataset[i][1] for i in dataset.indices]
+            images_tensor = torch.stack(images)
+        elif isinstance(dataset, dict) and 'images' in dataset and 'labels' in dataset:
+            # Handle numpy-style dataset
+            images = dataset['images']
+            labels = dataset['labels']
+            images_tensor = torch.stack([ToTensor()(img) for img in images])
+        else:
+            raise ValueError("Unsupported dataset format. Must be PyTorch Subset or dict with 'images' and 'labels'.")
+
+        num_images = len(images)
+        num_stylized = int(num_images * self.stylized_ratio)
+        stylized_indices = torch.randperm(num_images)[:num_stylized]
+
+        # Separate the stylized subset
+        stylized_subset = images_tensor[stylized_indices]
+
+        # Process images in batches
+        styled_images = []
+        for i in range(0, len(stylized_subset), self.batch_size):
+            print('one batch transformed', i)
+            batch = stylized_subset[i:min(i + self.batch_size, len(stylized_subset))]
+            transformed_batch = self.transform_style(batch)
+            styled_images.append(transformed_batch)
+
+        # Concatenate processed images
+        styled_images = torch.cat(styled_images)
+
+        # Update the dataset with styled images
+        images_tensor[stylized_indices] = styled_images
+
+        # Generate the transformed flags
+        style_mask = torch.zeros(num_images, dtype=torch.bool)
+        style_mask[stylized_indices] = True
+        style_mask = style_mask.tolist()
+
+        # Convert back to original format (e.g., PIL or numpy array)
+        if isinstance(dataset, torch.utils.data.Subset):
+            # Directly update the dataset with processed tensors
+            base_dataset = dataset.dataset
+            base_dataset.data[dataset.indices] = images_tensor.permute(0, 2, 3, 1).numpy()
+            updated_dataset = dataset
+
+        elif isinstance(dataset, dict):
+            updated_images = [img.numpy() for img in images_tensor]
+            updated_dataset = {'images': updated_images, 
+                               'labels': labels}
+        else:
+            raise ValueError("Unsupported dataset format. Must be PyTorch Subset or dict with 'images' and 'labels'.")
+        # Return updated dataset and transformation flags
+        return updated_dataset, style_mask
+
+
+class RandomChoiceTransforms:
+    def __init__(self, transforms, p):
+        assert len(transforms) == len(p), "The number of transforms and probabilities must match."
+
+        self.transforms = transforms
+        self.p = p
+
+    def __call__(self, x):
+        choice = random.choices(self.transforms, self.p)[0]
+        return choice(x)
+
+class BatchedRandomChoiceTransforms:
+    def __init__(self, batched_transform, batched_probability, other_transforms, other_probabilities):
+        """
+        Args:
+            transforms: List of transform functions. One must be named "stylization".
+            probabilities: List of probabilities corresponding to each transform.
+        """
+        assert len(other_transforms) == len(other_probabilities), "Number of transforms and probabilities must match."
+        assert abs(sum(other_probabilities + [batched_probability]) - 1.0) < 1e-6, "Probabilities must sum to 1."
+
+        # The stylization transform must be the first passed in the 
+        self.batched_transform = batched_transform
+        self.other_transforms = other_transforms
+        self.batched_probability = batched_probability
+        self.other_probabilities = other_probabilities
+
+    def __call__(self, batch):
+        """
+        Args:
+            batch: Tensor of shape [batch_size, ...]
+
+        Returns:
+            Transformed batch of the same shape.
+        """
+        batch_size = len(batch)
+        device = batch.device
+
+        # Randomly assign each image to a transform
+        choices = random.choices(self.other_transforms + [self.batched_transform], self.other_probabilities + [self.batched_probability], k=batch_size)
+
+        # Mask for batched stylization transform
+        stylization_mask = torch.tensor([choice == self.batched_transform for choice in choices], device=device)
+        
+        # Apply stylization in a batch-wise manner
+        if stylization_mask.any():
+            stylized_batch = self.batched_transform(batch[stylization_mask])
+        else:
+            stylized_batch = torch.empty_like(batch[stylization_mask])  # Empty tensor if no stylization is applied
+
+        # Apply other transforms iteratively
+        other_transformed = torch.empty_like(batch)
+        for idx, (img, choice) in enumerate(zip(batch, choices)):
+            if not stylization_mask[idx]:
+                other_transformed[idx] = choice(img)
+
+        # Merge results
+        result_batch = torch.clone(batch)
+        result_batch[stylization_mask] = stylized_batch
+        result_batch[~stylization_mask] = other_transformed[~stylization_mask]
+
+        return result_batch
+    
+class EmptyTransforms:
+    def __init__(self):
+        pass  # No operations needed for empty transforms.
+
+    def __call__(self, x):
+        return x
+
+class StylizedChoiceTransforms:
+    def __init__(self, transforms, probabilities):
+        assert len(transforms) == len(probabilities) == 2, "The number of transforms and probabilities must be 2, one before Stylization and one without Stylization."
+        self.transforms = transforms
+        self.probabilities = probabilities
+
+    def __call__(self, x):
+        choice = random.choices(list(self.transforms.items()), list(self.probabilities.values()))[0]
+        type, function = choice[0], choice[1]
+        if type == "before_stylization":
+            return function(x), True
+        elif type == "before_no_stylization":
+            return function(x), False
+        else:
+            raise ValueError("Invalid dict key for stylized choice transform.")
+
+class CustomTA_color(transforms_v2.TrivialAugmentWide):
+    _AUGMENTATION_SPACE = {
+    "Identity": (lambda num_bins, height, width: None, False),
+    "Brightness": (lambda num_bins, height, width: torch.linspace(0.0, 0.99, num_bins), True),
+    "Color": (lambda num_bins, height, width: torch.linspace(0.0, 0.99, num_bins), True),
+    "Contrast": (lambda num_bins, height, width: torch.linspace(0.0, 0.99, num_bins), True),
+    "Sharpness": (lambda num_bins, height, width: torch.linspace(0.0, 0.99, num_bins), True),
+    "Posterize": (lambda num_bins, height, width: (8 - (torch.arange(num_bins) / ((num_bins - 1) / 6))).round().int(), False),
+    "Solarize": (lambda num_bins, height, width: torch.linspace(1.0, 0.0, num_bins), False),
+    "AutoContrast": (lambda num_bins, height, width: None, False),
+    "Equalize": (lambda num_bins, height, width: None, False)
+    }
+
+class CustomTA_geometric(transforms_v2.TrivialAugmentWide):
+    _AUGMENTATION_SPACE = {
+    "Identity": (lambda num_bins, height, width: None, False),
+    "ShearX": (lambda num_bins, height, width: torch.linspace(0.0, 0.99, num_bins), True),
+    "ShearY": (lambda num_bins, height, width: torch.linspace(0.0, 0.99, num_bins), True),
+    "TranslateX": (lambda num_bins, height, width: torch.linspace(0.0, 32.0, num_bins), True),
+    "TranslateY": (lambda num_bins, height, width: torch.linspace(0.0, 32.0, num_bins), True),
+    "Rotate": (lambda num_bins, height, width: torch.linspace(0.0, 135.0, num_bins), True),
+    }
+
+def custom_collate_fn(batch, batch_transform_orig, batch_transform_gen, image_transform_orig, 
+                      image_transform_gen, generated_ratio, batchsize):
+
+    inputs, labels = zip(*batch)
+    batch_inputs = torch.stack(inputs)
+
+    # Apply the batched random choice transform
+    batch_inputs[:-int(generated_ratio*batchsize)] = batch_transform_orig(batch_inputs[:-int(generated_ratio*batchsize)])
+    batch_inputs[-int(generated_ratio*batchsize):] = batch_transform_gen(batch_inputs[-int(generated_ratio*batchsize):])
+
+    for i in range(len(batch_inputs)):
+        batch_inputs[i] = image_transform_orig(batch_inputs[i]) if i < (len(batch_inputs)-int(generated_ratio*batchsize)) else image_transform_gen(batch_inputs[i])
+
+    return batch_inputs, torch.tensor(labels)
+
+class GPU_Transforms():
+    def __init__(self, transforms_orig_gpu, transforms_orig_post, transforms_gen_gpu, transforms_gen_post):
+
+        self.transforms_orig_gpu = transforms_orig_gpu
+        self.transforms_orig_post = transforms_orig_post
+        self.transforms_gen_gpu = transforms_gen_gpu
+        self.transforms_gen_post = transforms_gen_post
+
+    def __call__(self, x, sources, apply):
+        
+        if self.transforms_orig_gpu == None and self.transforms_gen_gpu == None:
+            return x
+
+        x = x.to(device)
+
+        if x.size(0) == 2 * sources.size(0):
+            sources = torch.cat([sources, sources], dim=0)
+        
+        orig_mask = (sources) & (apply)
+        if orig_mask.any():
+            if apply[sources].sum().item() > 200:
+                #split the batch into chunks if the number of images to be stylized is more than 180 cause VRAM
+                chunks = torch.split(x[orig_mask], 200)
+                processed_chunks = [self.transforms_orig_gpu(chunk) for chunk in chunks]
+                x[orig_mask] = torch.cat(processed_chunks, dim=0)
+            else:
+                x[orig_mask] = self.transforms_orig_gpu(x[orig_mask])
+        
+        gen_mask = (~sources) & (apply)
+        if gen_mask.any():
+            if apply[~sources].sum().item() > 200:
+                #split the batch into chunks if the number of images to be stylized is more than 180 cause VRAM
+                chunks = torch.split(x[gen_mask], 200)
+                processed_chunks = [self.transforms_gen_gpu(chunk) for chunk in chunks]
+                x[gen_mask] = torch.cat(processed_chunks, dim=0)
+            else:
+                x[gen_mask] = self.transforms_gen_gpu(x[gen_mask])
+        
+        x = x.cpu()
+        if orig_mask.any():
+            x[orig_mask] = torch.stack([self.transforms_orig_post(image) for image in x[orig_mask]])
+        if gen_mask.any():
+            x[gen_mask] = torch.stack([self.transforms_gen_post(image) for image in x[gen_mask]])
+        x = x.to(device)
+
+        return x
