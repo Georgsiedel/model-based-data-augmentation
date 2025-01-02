@@ -8,7 +8,6 @@ if module_path not in sys.path:
 
 import argparse
 import importlib
-from multiprocessing import freeze_support
 import torch.multiprocessing as mp
 
 import numpy as np
@@ -224,7 +223,6 @@ if __name__ == '__main__':
     # Load and transform data
     print('Preparing data..')
 
-    freeze_support()
     mp.set_start_method('spawn', force=True)
 
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams

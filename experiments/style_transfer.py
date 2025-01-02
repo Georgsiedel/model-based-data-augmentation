@@ -97,8 +97,6 @@ class NSTTransform(transforms.Transform):
         if ratio == 0:
             return x
         
-        x = x.to(nst_device)
-        
         if single_image:
             x = x.unsqueeze(0)
         
@@ -106,8 +104,10 @@ class NSTTransform(transforms.Transform):
 
         idy = torch.randperm(self.num_styles)[0:ratio]
         idx = torch.randperm(x.size(0))[0:ratio]
-        x[idx] = self.style_transfer(self.vgg, self.decoder, x[idx], self.style_features[idy])
 
+        x = x.to(nst_device)
+        x[idx] = self.style_transfer(self.vgg, self.decoder, x[idx], self.style_features[idy])
+        x = x.cpu()
         stl_imgs = self.downsample(x)
 
         stl_imgs = self.norm_style_tensor(stl_imgs)
@@ -115,7 +115,7 @@ class NSTTransform(transforms.Transform):
         if single_image:
             stl_imgs = stl_imgs.squeeze(0)
 
-        return stl_imgs.detach().cpu()
+        return stl_imgs
 
     @torch.no_grad()
     def norm_style_tensor(self, tensor):

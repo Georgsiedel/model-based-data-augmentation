@@ -106,13 +106,11 @@ class AugmentedDataset(torch.utils.data.Dataset):
     """Dataset wrapper to perform augmentations and allow robust loss functions."""
 
     def __init__(self, original_dataset, generated_dataset, transforms_preprocess, transforms_basic, 
-                 transforms_orig, transforms_gen, robust_samples=0):
+                 robust_samples=0):
         self.original_dataset = original_dataset
         self.generated_dataset = generated_dataset
         self.preprocess = transforms_preprocess
         self.transforms_basic = transforms_basic
-        self.transforms_orig = transforms_orig
-        self.transforms_gen = transforms_gen
         self.robust_samples = robust_samples
 
         self.num_original = len(original_dataset) if original_dataset else 0
@@ -122,15 +120,13 @@ class AugmentedDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         if idx < self.num_original:
             x, y = self.original_dataset[idx]
-            aug = self.transforms_orig
         else:
             # Select data from the generated dataset
             gen_idx = idx - self.num_original
             x = Image.fromarray(self.generated_dataset['images'][gen_idx])
             y = self.generated_dataset['labels'][gen_idx]
-            aug = self.transforms_gen
 
-        augment = transforms.Compose([self.preprocess, self.transforms_basic, aug])
+        augment = transforms.Compose([self.preprocess, self.transforms_basic])
 
         if self.robust_samples == 0:
             x = augment(x)
@@ -158,6 +154,59 @@ class RandomChoiceTransforms:
     def __call__(self, x):
         choice = random.choices(self.transforms, self.p)[0]
         return choice(x)
+
+class BatchedRandomChoiceTransforms:
+    def __init__(self, batched_transform, batched_probability, other_transforms, other_probabilities):
+        """
+        Args:
+            transforms: List of transform functions. One must be named "stylization".
+            probabilities: List of probabilities corresponding to each transform.
+        """
+        assert len(other_transforms) == len(other_probabilities), "Number of transforms and probabilities must match."
+        assert abs(sum(other_probabilities + [batched_probability]) - 1.0) < 1e-6, "Probabilities must sum to 1."
+
+        # The stylization transform must be the first passed in the 
+        self.batched_transform = batched_transform
+        self.other_transforms = other_transforms
+        self.batched_probability = batched_probability
+        self.other_probabilities = other_probabilities
+
+    def __call__(self, batch):
+        """
+        Args:
+            batch: Tensor of shape [batch_size, ...]
+
+        Returns:
+            Transformed batch of the same shape.
+        """
+        batch_size = len(batch)
+        device = batch.device
+
+        # Randomly assign each image to a transform
+        choices = random.choices(self.other_transforms + [self.batched_transform], self.other_probabilities + [self.batched_probability], k=batch_size)
+
+        # Mask for batched stylization transform
+        stylization_mask = torch.tensor([choice == self.batched_transform for choice in choices], device=device)
+        
+        # Apply stylization in a batch-wise manner
+        if stylization_mask.any():
+            stylized_batch = self.batched_transform(batch[stylization_mask])
+        else:
+            stylized_batch = torch.empty_like(batch[stylization_mask])  # Empty tensor if no stylization is applied
+
+        # Apply other transforms iteratively
+        other_transformed = torch.empty_like(batch)
+        for idx, (img, choice) in enumerate(zip(batch, choices)):
+            if not stylization_mask[idx]:
+                other_transformed[idx] = choice(img)
+
+        # Merge results
+        result_batch = torch.clone(batch)
+        result_batch[stylization_mask] = stylized_batch
+        result_batch[~stylization_mask] = other_transformed[~stylization_mask]
+
+        return result_batch
+
     
 class EmptyTransforms:
     def __init__(self):
@@ -288,31 +337,13 @@ class DataLoading():
                             [6, 8]),
                             None,
                             None),
-            "StyleTransfer": (StylizedChoiceTransforms(transforms={"before_stylization": EmptyTransforms(), 
-                                                        "before_no_stylization": EmptyTransforms()}, 
-                                                        probabilities={"before_stylization_probability": 1.0, 
-                                                        "before_no_stylization_probability": 0.0}),
-                                stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0),
-                              re),
-            "TAorStyle0.75": (StylizedChoiceTransforms(transforms={"before_stylization": EmptyTransforms(), 
-                                                        "before_no_stylization": transforms.Compose([transforms_v2.TrivialAugmentWide(), re])}, 
-                                                        probabilities={"before_stylization_probability": 0.75, 
-                                                        "before_no_stylization_probability": 0.25}),
-                                stylization(probability=0.95),
-                                re),
-            "TAorStyle0.5": transforms.Compose([RandomChoiceTransforms((transforms_v2.TrivialAugmentWide(), stylization(probability=0.95)), (0.5, 0.5)), re]),
-            "TAorStyle0.25": (StylizedChoiceTransforms(transforms={"before_stylization": EmptyTransforms(), 
-                                                        "before_no_stylization": transforms.Compose([transforms_v2.TrivialAugmentWide(), re])}, 
-                                                        probabilities={"before_stylization_probability": 0.25, 
-                                                        "before_no_stylization_probability": 0.75}),
-                                stylization(probability=0.95),
-                                re),
-            "TAorStyle0.1": (StylizedChoiceTransforms(transforms={"before_stylization": EmptyTransforms(), 
-                                                        "before_no_stylization": transforms.Compose([transforms_v2.TrivialAugmentWide(), re])}, 
-                                                        probabilities={"before_stylization_probability": 0.1, 
-                                                        "before_no_stylization_probability": 0.9}),
-                                stylization(probability=0.95),
-                                re),
+            "StyleTransfer": transforms.Compose([stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0), re]),
+            "TAorStyle0.75": transforms.Compose([RandomChoiceTransforms((transforms_v2.TrivialAugmentWide(), stylization(probability=0.95)), (0.25, 0.75)), re]),
+            "TAorStyle0.5": (BatchedRandomChoiceTransforms(batched_transform=stylization(probability=0.95), batched_probability=0.5, other_transforms=[transforms_v2.TrivialAugmentWide()], other_probabilities=[0.5]), 
+                             re),
+            "TAorStyle0.25": transforms.Compose([RandomChoiceTransforms((transforms_v2.TrivialAugmentWide(), stylization(probability=0.95)), (0.75, 0.25)), re]),
+            "TAorStyle0.1": (BatchedRandomChoiceTransforms(batched_transform=stylization(probability=0.95), batched_probability=0.1, other_transforms=[transforms_v2.TrivialAugmentWide()], other_probabilities=[0.9]), 
+                             re),
             "StyleAndTA": (StylizedChoiceTransforms(transforms={"before_stylization": EmptyTransforms(), 
                                                         "before_no_stylization": EmptyTransforms()}, 
                                                         probabilities={"before_stylization_probability": 1.0, 
@@ -343,16 +374,15 @@ class DataLoading():
             "AugMix": (transforms.Compose([transforms_v2.AugMix(), re]),
                        None,
                        None),
-            'None': (re, 
-                     None,
-                     None),
+            'None': (None, 
+                     re),
         }
 
-        self.transforms_orig = (transform_map[train_aug_strat_orig]
+        self.batch_transform_orig, self.image_transform_orig = (transform_map[train_aug_strat_orig]
             if train_aug_strat_orig in transform_map
             else transform_not_found(train_aug_strat_orig, 'transforms_original'))
 
-        self.transforms_gen = (transform_map[train_aug_strat_gen]
+        self.batch_transform_gen, self.image_transform_gen = (transform_map[train_aug_strat_gen]
                                         if train_aug_strat_gen in transform_map
                                         else transform_not_found(train_aug_strat_gen, 'transforms_generated'))
         
@@ -435,7 +465,7 @@ class DataLoading():
             generated_subset = None
 
         self.trainset = AugmentedDataset(original_subset, generated_subset, self.transforms_preprocess, 
-                                         self.transforms_basic, self.transforms_orig, self.transforms_gen, self.robust_samples)
+                                         self.transforms_basic, self.robust_samples)
 
     def load_data_c(self, subset, subsetsize):
 
@@ -485,9 +515,24 @@ class DataLoading():
             self.c_datasets_dict = {label: dataset for label, dataset in zip([corr for corr, _ in corruptions], c_datasets)}
 
         return self.c_datasets_dict
+    
+    def custom_collate_fn(self, batch):
+
+        inputs, labels = zip(*batch)
+        batch_inputs = torch.stack(inputs)
+
+        # Apply the batched random choice transform
+        batch_inputs[:-int(self.generated_ratio*self.batchsize)] = self.batch_transform_orig(batch_inputs[:-int(self.generated_ratio*self.batchsize)])
+        batch_inputs[-int(self.generated_ratio*self.batchsize):] = self.batch_transform_gen(batch_inputs[-int(self.generated_ratio*self.batchsize):])
+
+        for i in range(len(batch_inputs)):
+            batch_inputs[i] = self.image_transform_orig(batch_inputs[i]) if i < (len(batch_inputs)-int(self.generated_ratio*self.batchsize)) else self.image_transform_gen(batch_inputs[i])
+
+        return batch_inputs, torch.tensor(labels)
 
     def get_loader(self, batchsize, number_workers):
         self.number_workers = number_workers
+        self.batchsize = batchsize
 
         g = torch.Generator()
         g.manual_seed(self.epoch + self.epochs * self.run)
@@ -497,8 +542,12 @@ class DataLoading():
                                                  batch_size=batchsize)
         else:
             self.CustomSampler = BatchSampler(RandomSampler(self.trainset), batch_size=batchsize, drop_last=False)
-        self.trainloader = DataLoader(self.trainset, batch_sampler=self.CustomSampler, pin_memory=True,
-                                      num_workers=number_workers, worker_init_fn=seed_worker, generator=g)
+
+        self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
+                                      num_workers=number_workers, worker_init_fn=seed_worker, 
+                                      collate_fn=self.custom_collate_fn,
+                                        generator=g)
+
         self.validationloader = DataLoader(self.validset, batch_size=batchsize, pin_memory=False, num_workers=0)
 
         return self.trainloader, self.validationloader
@@ -511,7 +560,7 @@ class DataLoading():
         g = torch.Generator()
         g.manual_seed(self.epoch + self.epochs * self.run)
         self.trainloader = DataLoader(self.trainset, batch_sampler=self.CustomSampler, pin_memory=True,
-                                      num_workers=self.number_workers, worker_init_fn=seed_worker, generator=g)
+                                      num_workers=self.number_workers, collate_fn=self.custom_collate_fn, worker_init_fn=seed_worker, generator=g)
         return self.trainloader
 
 class GPU_Transforms():
