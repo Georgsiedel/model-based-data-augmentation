@@ -161,20 +161,20 @@ class AugmentedDataset(torch.utils.data.Dataset):
         self.transforms_orig_after_nostyle = transforms_orig_after_nostyle
         self.transforms_gen_after_nostyle = transforms_gen_after_nostyle
         self.robust_samples = robust_samples
-        self.group_size = group_size
+        #self.group_size = group_size
 
         self.num_original = len(original_dataset) if original_dataset else 0
         self.num_generated = len(generated_dataset['images']) if generated_dataset else 0
         self.total_size = self.num_original + self.num_generated
 
         # Create groups for original and generated indices like in the Batch Sampler
-        self.original_groups = self._create_groups(self.num_original)
-        self.generated_groups = self._create_groups(self.num_generated, offset=self.num_original)
+        #self.original_groups = self._create_groups(self.num_original)
+        #self.generated_groups = self._create_groups(self.num_generated, offset=self.num_original)
 
         # Initialize cached dataset
-        self.cached_dataset = [None] * self.total_size
-        if robust_samples == 2:
-            self.cached_dataset_2 = [None] * self.total_size
+        #self.cached_dataset = [None] * self.total_size
+        #if robust_samples == 2:
+        #    self.cached_dataset_2 = [None] * self.total_size
 
     def _create_groups(self, num_items, offset=0):
         """Create reproducible groups by dividing the range into intervals."""
@@ -203,7 +203,7 @@ class AugmentedDataset(torch.utils.data.Dataset):
         if idx < self.num_original:
             x, y = self.stylized_original_dataset[idx]
             is_generated = False
-            is_stylized = self.style_mask_orig[idx - self.num_original] if self.style_mask_orig is not None else False
+            is_stylized = self.style_mask_orig[idx] if self.style_mask_orig is not None else False
         else:
             x = Image.fromarray(self.stylized_generated_dataset['images'][idx - self.num_original])
             y = self.stylized_generated_dataset['labels'][idx - self.num_original]
