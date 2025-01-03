@@ -202,16 +202,13 @@ class AugmentedDataset(torch.utils.data.Dataset):
 
         if idx < self.num_original:
             x, y = self.stylized_original_dataset[idx]
-            is_generated = True
+            is_generated = False
+            is_stylized = self.style_mask_orig[idx - self.num_original] if self.style_mask_orig is not None else False
         else:
             x = Image.fromarray(self.stylized_generated_dataset['images'][idx - self.num_original])
-            y = self.stylized_generated_dataset['label'][idx - self.num_original]
-            is_generated = False
-        
-        if self.style_mask_gen is not None:
-            is_stylized = self.style_mask_gen[idx - self.num_original] if is_generated else self.style_mask_orig[idx]
-        else:
-            is_stylized = False
+            y = self.stylized_generated_dataset['labels'][idx - self.num_original]
+            is_generated = True
+            is_stylized = self.style_mask_gen[idx - self.num_original] if self.style_mask_gen is not None else False
 
         #if self.cached_dataset[idx] is None:
 #
@@ -345,13 +342,13 @@ class DataLoading():
                             None),
             "StyleTransfer": transforms.Compose([stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0), re]),
             "TAorStyle0.75": transforms.Compose([custom_transforms.RandomChoiceTransforms((transforms_v2.TrivialAugmentWide(), stylization(probability=0.95)), (0.25, 0.75)), re]),
-            "TAorStyle0.5": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.5, batch_size=100, transform_style=stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0)), 
+            "TAorStyle0.5": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0)), 
                              re,
-                             transforms_v2.TrivialAugmentWide()),
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
             "TAorStyle0.25": transforms.Compose([custom_transforms.RandomChoiceTransforms((transforms_v2.TrivialAugmentWide(), stylization(probability=0.95)), (0.75, 0.25)), re]),
-            "TAorStyle0.1": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.1, batch_size=100, transform_style=stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0)), 
+            "TAorStyle0.1": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.1, batch_size=50, transform_style=stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0)), 
                              re,
-                             transforms_v2.TrivialAugmentWide()),
+                             transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
             "StyleAndTA": (custom_transforms.StylizedChoiceTransforms(transforms={"before_stylization": custom_transforms.EmptyTransforms(), 
                                                         "before_no_stylization": custom_transforms.EmptyTransforms()}, 
                                                         probabilities={"before_stylization_probability": 1.0, 
@@ -474,7 +471,6 @@ class DataLoading():
                 'images': self.generated_dataset['image'][generated_indices],
                 'labels': self.generated_dataset['label'][generated_indices]
             }
-            print(generated_subset['images'][0])
 
             if self.stylization_gen is not None:
                 stylized_generated_subset, style_mask_gen = self.stylization_gen(generated_subset)
@@ -482,7 +478,6 @@ class DataLoading():
                 stylized_generated_subset, style_mask_gen = None, None
         else:
             generated_subset, stylized_generated_subset, style_mask_gen = None, None, None
-        print(stylized_generated_subset['images'][0])
         self.trainset = AugmentedDataset(original_subset, stylized_original_subset, generated_subset, stylized_generated_subset, 
                                          style_mask_orig, style_mask_gen, self.transforms_preprocess, 
                                          self.transforms_basic, self.transforms_orig_after_style, self.transforms_gen_after_style, 

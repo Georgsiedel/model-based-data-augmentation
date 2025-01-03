@@ -9,6 +9,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 import torch
 from torchvision.transforms import ToTensor, ToPILImage
 import numpy as np
+from experiments.utils import plot_images
 
 class DatasetStyleTransforms:
     def __init__(self, stylized_ratio, batch_size, transform_style):
@@ -58,10 +59,10 @@ class DatasetStyleTransforms:
         # Process images in batches
         styled_images = []
         for i in range(0, len(stylized_subset), self.batch_size):
-            print('one batch transformed', i)
             batch = stylized_subset[i:min(i + self.batch_size, len(stylized_subset))]
             transformed_batch = self.transform_style(batch)
             styled_images.append(transformed_batch)
+            plot_images(images_tensor[:4], transformed_batch[:4], 4, 0.0, 1.0)
 
         # Concatenate processed images
         styled_images = torch.cat(styled_images)
@@ -82,6 +83,7 @@ class DatasetStyleTransforms:
             updated_dataset = dataset
 
         elif isinstance(dataset, dict):
+            images_tensor = (images_tensor*255).to(torch.uint8).permute(0, 2, 3, 1)
             updated_images = [img.numpy() for img in images_tensor]
             updated_dataset = {'images': updated_images, 
                                'labels': labels}

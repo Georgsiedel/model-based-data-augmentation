@@ -21,7 +21,7 @@ import adaIN.utils as utils
 if torch.cuda.is_available():
     device = torch.device('cuda')
     if torch.cuda.device_count() >= 2:
-        nst_device = torch.device('cuda:1') #'cuda:1'
+        nst_device = torch.device('cuda') #'cuda:1'
     else:
         nst_device = torch.device('cuda')
 else:
