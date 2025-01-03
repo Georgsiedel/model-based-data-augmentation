@@ -62,7 +62,7 @@ class DatasetStyleTransforms:
             batch = stylized_subset[i:min(i + self.batch_size, len(stylized_subset))]
             transformed_batch = self.transform_style(batch)
             styled_images.append(transformed_batch)
-            plot_images(images_tensor[:4], transformed_batch[:4], 4, 0.0, 1.0)
+            plot_images(stylized_subset[i:min(i + self.batch_size, len(stylized_subset))], transformed_batch, 4, 0.0, 1.0)
 
         # Concatenate processed images
         styled_images = torch.cat(styled_images)
