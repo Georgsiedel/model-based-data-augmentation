@@ -210,6 +210,7 @@ class AugmentedDataset(torch.utils.data.Dataset):
             is_generated = True
             is_stylized = self.style_mask_gen[idx - self.num_original] if self.style_mask_gen is not None else False
 
+
         #if self.cached_dataset[idx] is None:
 #
 #            # Determine group and dataset
@@ -478,6 +479,7 @@ class DataLoading():
                 stylized_generated_subset, style_mask_gen = None, None
         else:
             generated_subset, stylized_generated_subset, style_mask_gen = None, None, None
+
         self.trainset = AugmentedDataset(original_subset, stylized_original_subset, generated_subset, stylized_generated_subset, 
                                          style_mask_orig, style_mask_gen, self.transforms_preprocess, 
                                          self.transforms_basic, self.transforms_orig_after_style, self.transforms_gen_after_style, 

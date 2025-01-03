@@ -38,37 +38,30 @@ class DatasetStyleTransforms:
         """
         if isinstance(dataset, torch.utils.data.Subset):
             # Handle PyTorch Subset
-            images = [ToTensor()(dataset.dataset[i][0]) for i in dataset.indices]
-            labels = [dataset.dataset[i][1] for i in dataset.indices]
+            num_images = len(dataset.indices)
+            stylized_indices = torch.randperm(num_images)[:int(num_images * self.stylized_ratio)]
+            images = [ToTensor()(dataset.dataset[i][0]) for i in stylized_indices]
             images_tensor = torch.stack(images)
         elif isinstance(dataset, dict) and 'images' in dataset and 'labels' in dataset:
             # Handle numpy-style dataset
             images = dataset['images']
             labels = dataset['labels']
-            images_tensor = torch.stack([ToTensor()(img) for img in images])
+            num_images = len(images)
+            stylized_indices = torch.randperm(num_images)[:int(num_images * self.stylized_ratio)]
+            images_tensor = torch.stack([ToTensor()(img) for img in images[stylized_indices]])
         else:
             raise ValueError("Unsupported dataset format. Must be PyTorch Subset or dict with 'images' and 'labels'.")
 
-        num_images = len(images)
-        num_stylized = int(num_images * self.stylized_ratio)
-        stylized_indices = torch.randperm(num_images)[:num_stylized]
-
-        # Separate the stylized subset
-        stylized_subset = images_tensor[stylized_indices]
-
         # Process images in batches
-        styled_images = []
-        for i in range(0, len(stylized_subset), self.batch_size):
-            batch = stylized_subset[i:min(i + self.batch_size, len(stylized_subset))]
+        stylized_images = []
+        for i in range(0, len(images_tensor), self.batch_size):
+            batch = images_tensor[i:min(i + self.batch_size, len(images_tensor))]
             transformed_batch = self.transform_style(batch)
-            styled_images.append(transformed_batch)
-            plot_images(stylized_subset[i:min(i + self.batch_size, len(stylized_subset))], transformed_batch, 4, 0.0, 1.0)
+
+            stylized_images.append(transformed_batch)
 
         # Concatenate processed images
-        styled_images = torch.cat(styled_images)
-
-        # Update the dataset with styled images
-        images_tensor[stylized_indices] = styled_images
+        stylized_images = torch.cat(stylized_images)
 
         # Generate the transformed flags
         style_mask = torch.zeros(num_images, dtype=torch.bool)
@@ -79,13 +72,14 @@ class DatasetStyleTransforms:
         if isinstance(dataset, torch.utils.data.Subset):
             # Directly update the dataset with processed tensors
             base_dataset = dataset.dataset
-            base_dataset.data[dataset.indices] = images_tensor.permute(0, 2, 3, 1).numpy()
+            base_dataset.data[stylized_indices] = (stylized_images*255).to(torch.uint8).permute(0, 2, 3, 1).numpy()
             updated_dataset = dataset
 
         elif isinstance(dataset, dict):
-            images_tensor = (images_tensor*255).to(torch.uint8).permute(0, 2, 3, 1)
-            updated_images = [img.numpy() for img in images_tensor]
-            updated_dataset = {'images': updated_images, 
+            stylized_images = (stylized_images*255).to(torch.uint8).permute(0, 2, 3, 1)
+            updated_images = [img.numpy() for img in stylized_images]
+            images[stylized_indices] = updated_images
+            updated_dataset = {'images': images,
                                'labels': labels}
         else:
             raise ValueError("Unsupported dataset format. Must be PyTorch Subset or dict with 'images' and 'labels'.")
