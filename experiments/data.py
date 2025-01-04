@@ -1,6 +1,7 @@
 import random
 import os
 import time
+import json
 
 import torch
 from PIL import Image
@@ -227,7 +228,7 @@ class CustomTA_geometric(transforms_v2.TrivialAugmentWide):
     }
 
 class DataLoading():
-    def __init__(self, dataset, epochs=200, generated_ratio=0.0, resize = False, run=0, test_only = False, factor = 1):
+    def __init__(self, dataset, epochs=200, generated_ratio=0.0, resize = False, run=0, test_only = False, factor = 1, kaggle=False):
         self.dataset = dataset
         self.generated_ratio = generated_ratio
         self.resize = resize
@@ -235,6 +236,18 @@ class DataLoading():
         self.epochs = epochs
         self.test_only = test_only
         self.factor = factor
+        self.kaggle = kaggle
+
+        if self.kaggle:
+            with open('kaggle_path.json', 'r') as f:
+                self.path = json.load(f)
+                self.gen_path = self.path.get(f'{self.dataset}-gen')
+                self.corrupt_path = self.path.get(f'{self.dataset}-C')
+            
+            if not self.gen_path or not self.corrupt_path:
+                raise KeyError(
+                    f"Missing keys for dataset '{self.dataset}' in kaggle_path.json."
+                )
 
     def create_transforms(self, train_aug_strat_orig, train_aug_strat_gen, RandomEraseProbability=0.0):
         # list of all data transformations used
@@ -390,7 +403,7 @@ class DataLoading():
         # Trainset and Validset
         if self.test_only == False:
             if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                self.base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train'))
+                self.base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train')) 
             else:
                 load_helper = getattr(torchvision.datasets, self.dataset)
                 self.base_trainset = load_helper(root=os.path.abspath('../data'), train=True, download=True)
@@ -435,7 +448,10 @@ class DataLoading():
     def load_augmented_traindata(self, target_size, epoch=0, robust_samples=0):
         self.robust_samples = robust_samples
         self.target_size = target_size
-        self.generated_dataset = np.load(os.path.abspath(f'../data/{self.dataset}-add-1m-dm.npz'),
+        if self.kaggle:
+            self.generated_dataset = np.load(self.gen_path, mmap_mode='r') if self.generated_ratio > 0.0 else None
+        else:
+            self.generated_dataset = np.load(os.path.abspath(f'../data/{self.dataset}-add-1m-dm.npz'),
                                     mmap_mode='r') if self.generated_ratio > 0.0 else None
         self.epoch = epoch
 
@@ -469,16 +485,19 @@ class DataLoading():
 
         c_datasets = []
         #c-corruption benchmark: https://github.com/hendrycks/robustness
-        corruptions_c = np.asarray(np.loadtxt(os.path.abspath('../data/c-labels.txt'), dtype=list))
+        corruptions_c = np.asarray(np.loadtxt(os.path.abspath('../data/c-labels.txt'), dtype=list)) # CHANGE for Kaggle
 
         if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
             #c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
-            corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-cifar.txt'), dtype=list))
+            corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-cifar.txt'), dtype=list)) # CHANGE for Kaggle
             corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
 
             for corruption, set in corruptions:
                 subtestset = self.testset
-                np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'))
+                if self.kaggle:
+                    np_data_c = np.load(os.path.abspath(f'{self.corrupt_path}/{corruption}.npy'))
+                else:
+                    np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'))
                 np_data_c = np.array(np.array_split(np_data_c, 5))
 
                 if subset == True:
