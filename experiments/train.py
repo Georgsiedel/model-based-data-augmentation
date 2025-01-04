@@ -122,6 +122,7 @@ parser.add_argument('--noise_patch_scale', default={'lower': 0.3, 'upper': 1.0},
                     'gets perturbed by random noise')
 parser.add_argument('--generated_ratio', default=0.0, type=float, help='ratio of synthetically generated images mixed '
                     'into every training batch')
+parser.add_argument('--kaggle', type=bool, default=False, help='Whether to run on Kaggle or locally')
 
 args = parser.parse_args()
 configname = (f'experiments.configs.config{args.experiment}')
@@ -232,7 +233,7 @@ if __name__ == '__main__':
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams
     criterion = losses.Criterion(args.loss, trades_loss=args.trades_loss, robust_loss=args.robust_loss, **lossparams)
 
-    Dataloader = data.DataLoading(args.dataset, args.epochs, args.generated_ratio, args.resize, args.run, factor=args.pixel_factor)
+    Dataloader = data.DataLoading(args.dataset, args.epochs, args.generated_ratio, args.resize, args.run, factor=args.pixel_factor, kaggle=args.kaggle)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
     Dataloader.load_base_data(args.validontest, args.run)
     testsets_c = Dataloader.load_data_c(subset=args.validonc, subsetsize=100) if args.validonc else None
