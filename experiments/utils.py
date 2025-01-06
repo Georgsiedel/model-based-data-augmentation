@@ -138,11 +138,21 @@ class Checkpoint:
         self.trace_func = trace_func
         self.early_stopping = earlystopping
         self.checkpoint_path = os.path.abspath(checkpoint_path)
+        current_dir = os.path.dirname(__file__)
+
         if combine_train_corruptions:
-            self.final_model_path = os.path.abspath(f'../trained_models/{dataset}/{modeltype}/config{experiment}_run_{run}.pth')
+            self.final_model_path = os.path.join(
+                current_dir,
+                f'../trained_models/{dataset}/{modeltype}/config{experiment}_run_{run}.pth'
+            )
         else:
-            self.final_model_path = os.path.abspath(f'../trained_models/{dataset}/{modeltype}/config{experiment}_' \
-                    f'{train_corruption["noise_type"]}_eps_{train_corruption["epsilon"]}_{train_corruption["sphere"]}_run_{run}.pth')
+            self.final_model_path = os.path.join(
+                current_dir,
+                f'../trained_models/{dataset}/{modeltype}/config{experiment}_'
+                f'{train_corruption["noise_type"]}_eps_{train_corruption["epsilon"]}_'
+                f'{train_corruption["sphere"]}_run_{run}.pth'
+            )
+
 
 
     def earlystopping(self, val_acc):
