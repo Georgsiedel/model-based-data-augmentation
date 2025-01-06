@@ -605,7 +605,7 @@ class DataLoading():
             #c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
             c_bar_path = os.path.join(current_dir, '../data/c-bar-labels-cifar.txt')
             corruptions_bar = np.asarray(np.loadtxt(c_bar_path, dtype=list)) # CHANGE for Kaggle
-            corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
+            corruptions = [(string, 'c') for string in corruptions_c] #+ [(string, 'c-bar') for string in corruptions_bar]
 
             for corruption, set in corruptions:
                 subtestset = self.testset
