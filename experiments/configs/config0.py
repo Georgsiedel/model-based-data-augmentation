@@ -18,7 +18,6 @@ combine_train_corruptions = True #augment the train dataset with all corruptions
 concurrent_combinations = 1 #only has an effect if combine_train_corruption is True
 kaggle = True # To run the experiments on Kaggle, set this to True
 
-
 batchsize = 512
 minibatchsize = 8
 dataset = 'CIFAR100' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
@@ -29,7 +28,7 @@ validonc = True
 validonadv = False
 lrschedule = 'CosineAnnealingWarmRestarts'
 learningrate = 0.15
-epochs = 450
+epochs = 10
 lrparams = {'T_0': 30, 'T_mult': 2}
 warmupepochs = 0
 earlystop = False
@@ -42,7 +41,7 @@ modelparams = {'dropout_rate': 0.2, 'activation_function': 'silu'}
 resize = False
 aug_strat_check = True
 train_aug_strat_orig = 'TAorStyle0.1' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
-train_aug_strat_gen = 'TAorStyle0.25' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+train_aug_strat_gen = 'TAorStyle0.5' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 loss = 'CrossEntropyLoss'
 lossparams = {'label_smoothing': 0.1}
 trades_loss = False

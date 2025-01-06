@@ -42,7 +42,7 @@ if __name__ == '__main__':
                        f" --normalize={config.normalize} --pixel_factor={config.pixel_factor} --minibatchsize=" \
                        f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                        f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
-                       f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} "
+                       f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} --kaggle={config.kaggle} "
                 os.system(cmd0)
             else:
                 for id, (train_corruption) in enumerate(config.train_corruptions):
@@ -66,7 +66,7 @@ if __name__ == '__main__':
                            f" --normalize={config.normalize} --pixel_factor={config.pixel_factor} --minibatchsize=" \
                            f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                            f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
-                           f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} "
+                           f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} --kaggle={config.kaggle} "
                     os.system(cmd0)
 
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
