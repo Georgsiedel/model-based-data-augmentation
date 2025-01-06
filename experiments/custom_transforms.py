@@ -9,6 +9,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 import torch
 from torchvision.transforms import ToTensor, ToPILImage
 import numpy as np
+import time
 from experiments.utils import plot_images
 
 class DatasetStyleTransforms:
@@ -36,33 +37,42 @@ class DatasetStyleTransforms:
             updated_dataset: Updated dataset with stylized images.
             transformed_flags: Boolean list indicating which images were transformed.
         """
+
         if isinstance(dataset, torch.utils.data.Subset):
             # Handle PyTorch Subset
-            num_images = len(dataset.indices)
-            stylized_indices = torch.randperm(num_images)[:int(num_images * self.stylized_ratio)]
-            images = [ToTensor()(dataset.dataset[i][0]) for i in stylized_indices]
-            images_tensor = torch.stack(images)
+            subset_indices = dataset.indices
+
+            # Load all images at once (batch-wise slicing if supported by dataset)
+            if hasattr(dataset.dataset, 'data') and hasattr(dataset.dataset, 'targets'):
+                # CIFAR-like datasets (data and targets are attributes)
+                images = [dataset.dataset.data[i] for i in subset_indices]  # Convert to PIL
+                labels = [dataset.dataset.targets[i] for i in subset_indices]
+            else:
+                images = [dataset[i][0] for i in range(len(dataset.indices))]  # Images
+                labels = [dataset[i][1] for i in range(len(dataset.indices))]  # Labels
+
         elif isinstance(dataset, dict) and 'images' in dataset and 'labels' in dataset:
             # Handle numpy-style dataset
             images = dataset['images']
             labels = dataset['labels']
-            num_images = len(images)
-            stylized_indices = torch.randperm(num_images)[:int(num_images * self.stylized_ratio)]
-            images_tensor = torch.stack([ToTensor()(img) for img in images[stylized_indices]])
         else:
             raise ValueError("Unsupported dataset format. Must be PyTorch Subset or dict with 'images' and 'labels'.")
+        
+        num_images = len(images)
+        stylized_indices = torch.randperm(num_images)[:int(num_images * self.stylized_ratio)]
 
         # Process images in batches
         stylized_images = []
-        for i in range(0, len(images_tensor), self.batch_size):
-            batch = images_tensor[i:min(i + self.batch_size, len(images_tensor))]
-            transformed_batch = self.transform_style(batch)
-
+        for i in range(0, len(stylized_indices), self.batch_size):
+            batch_indices = stylized_indices[i:min(i + self.batch_size, len(stylized_indices))]
+            batch_images = [ToTensor()(images[j]) for j in batch_indices]
+            batch_tensor = torch.stack(batch_images)
+            transformed_batch = self.transform_style(batch_tensor)
             stylized_images.append(transformed_batch)
 
         # Concatenate processed images
         stylized_images = torch.cat(stylized_images)
-
+ 
         # Generate the transformed flags
         style_mask = torch.zeros(num_images, dtype=torch.bool)
         style_mask[stylized_indices] = True
@@ -70,10 +80,10 @@ class DatasetStyleTransforms:
 
         # Convert back to original format (e.g., PIL or numpy array)
         if isinstance(dataset, torch.utils.data.Subset):
-            # Directly update the dataset with processed tensors
-            base_dataset = dataset.dataset
-            base_dataset.data[stylized_indices] = (stylized_images*255).to(torch.uint8).permute(0, 2, 3, 1).numpy()
-            updated_dataset = dataset
+            stylized_images = (stylized_images*255).to(torch.uint8).permute(0, 2, 3, 1)
+            for idx, stylized_image in zip(stylized_indices, stylized_images):
+                images[idx] = stylized_image.numpy()
+            updated_dataset = [(img, label) for img, label in zip(images, labels)]
 
         elif isinstance(dataset, dict):
             stylized_images = (stylized_images*255).to(torch.uint8).permute(0, 2, 3, 1)
@@ -84,6 +94,7 @@ class DatasetStyleTransforms:
         else:
             raise ValueError("Unsupported dataset format. Must be PyTorch Subset or dict with 'images' and 'labels'.")
         # Return updated dataset and transformation flags
+
         return updated_dataset, style_mask
 
 

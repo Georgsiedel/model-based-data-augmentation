@@ -110,7 +110,7 @@ class NSTTransform(transforms.Transform):
         x = x.cpu()
         stl_imgs = self.downsample(x)
 
-        stl_imgs = self.norm_style_tensor(stl_imgs)
+        #stl_imgs = self.norm_style_tensor(stl_imgs)
 
         if single_image:
             stl_imgs = stl_imgs.squeeze(0)

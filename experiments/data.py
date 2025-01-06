@@ -293,7 +293,7 @@ class AugmentedDataset(torch.utils.data.Dataset):
 
     def __init__(self, original_dataset, stylized_original_dataset, generated_dataset, stylized_generated_dataset, style_mask_orig, 
                  style_mask_gen, transforms_preprocess, transforms_basic, transforms_orig_after_style, transforms_gen_after_style, 
-                 transforms_orig_after_nostyle, transforms_gen_after_nostyle, robust_samples=0, group_size=32):
+                 transforms_orig_after_nostyle, transforms_gen_after_nostyle, robust_samples=0):
         self.original_dataset = original_dataset
         self.stylized_original_dataset = stylized_original_dataset
         self.generated_dataset = generated_dataset
@@ -315,14 +315,15 @@ class AugmentedDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
 
         if idx < self.num_original:
-            x, y = self.stylized_original_dataset[idx]
+            
             is_generated = False
             is_stylized = self.style_mask_orig[idx] if self.style_mask_orig is not None else False
+            x, y = self.stylized_original_dataset[idx] if is_stylized else self.original_dataset[idx]
         else:
-            x = Image.fromarray(self.stylized_generated_dataset['images'][idx - self.num_original])
-            y = self.stylized_generated_dataset['labels'][idx - self.num_original]
             is_generated = True
             is_stylized = self.style_mask_gen[idx - self.num_original] if self.style_mask_gen is not None else False
+            x = Image.fromarray(self.stylized_generated_dataset['images'][idx - self.num_original]) if is_stylized else Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
+            y = self.generated_dataset['labels'][idx - self.num_original]
 
         if is_generated:
             aug = self.transforms_gen_after_style if is_stylized else self.transforms_gen_after_nostyle
@@ -432,13 +433,17 @@ class DataLoading():
                             [6, 8]),
                             None,
                             None),
-            "StyleTransfer": transforms.Compose([stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0), re]),
-            "TAorStyle0.75": transforms.Compose([custom_transforms.RandomChoiceTransforms((transforms_v2.TrivialAugmentWide(), stylization(probability=0.95)), (0.25, 0.75)), re]),
-            "TAorStyle0.5": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.5, batch_size=5, transform_style=stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0)), 
+            "StyleTransfer": transforms.Compose([stylization(probability=0.95, alpha_min=0.0, alpha_max=0.3), re]),
+            "TAorStyle0.75": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.75, batch_size=50, transform_style=stylization(probability=0.95, alpha_min=0.0, alpha_max=0.3)), 
+                             re,
+                             transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+            "TAorStyle0.5": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(probability=0.95, alpha_min=0.0, alpha_max=0.3)), 
                              re,
                             transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
-            "TAorStyle0.25": transforms.Compose([custom_transforms.RandomChoiceTransforms((transforms_v2.TrivialAugmentWide(), stylization(probability=0.95)), (0.75, 0.25)), re]),
-            "TAorStyle0.1": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.1, batch_size=5, transform_style=stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0)), 
+            "TAorStyle0.25": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.25, batch_size=50, transform_style=stylization(probability=0.95, alpha_min=0.0, alpha_max=0.3)), 
+                             re,
+                             transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+            "TAorStyle0.1": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.1, batch_size=50, transform_style=stylization(probability=0.95, alpha_min=0.0, alpha_max=0.3)), 
                              re,
                              transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
             "StyleAndTA": (custom_transforms.StylizedChoiceTransforms(transforms={"before_stylization": custom_transforms.EmptyTransforms(), 
@@ -459,9 +464,9 @@ class DataLoading():
                                                         "before_no_stylization_probability": 0.5}),
                                 stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0),
                               transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
-            "TrivialAugmentWide": (transforms.Compose([transforms_v2.TrivialAugmentWide(), re]),
+            "TrivialAugmentWide": (None,
                             None,
-                            None),
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
             "RandAugment": (transforms.Compose([transforms_v2.RandAugment(), re]),
                             None,
                             None),
@@ -648,7 +653,7 @@ class DataLoading():
 
     def update_trainset(self, epoch, start_epoch):
 
-        if self.generated_ratio != 0.0 and epoch != 0 and epoch != start_epoch:
+        if (self.generated_ratio != 0.0 or self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
             self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
 
         g = torch.Generator()
