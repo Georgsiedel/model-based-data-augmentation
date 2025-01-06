@@ -8,7 +8,6 @@ if module_path not in sys.path:
 
 import argparse
 import importlib
-from multiprocessing import freeze_support
 import torch.multiprocessing as mp
 
 import numpy as np
@@ -136,13 +135,11 @@ def train_epoch(pbar):
 
     model.train()
     correct, total, train_loss, avg_train_loss = 0, 0, 0, 0
-    for batch_idx, (inputs, targets, sources, apply_gpu_transform) in enumerate(trainloader):
+    for batch_idx, (inputs, targets) in enumerate(trainloader):
 
         optimizer.zero_grad()
         if criterion.robust_samples >= 1:
-            inputs = torch.cat((inputs[0], Dataloader.transforms_gpu(torch.cat(inputs[1:], 0), sources, apply_gpu_transform[1:])), 0)
-        else:
-            inputs = Dataloader.transforms_gpu(inputs, sources, apply_gpu_transform)
+            inputs = torch.cat(inputs, 0)
         
         inputs, targets = inputs.to(device, dtype=torch.float32), targets.to(device)
         with torch.amp.autocast(device_type=device):
@@ -227,7 +224,6 @@ if __name__ == '__main__':
     # Load and transform data
     print('Preparing data..')
 
-    freeze_support()
     mp.set_start_method('spawn', force=True)
 
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams
@@ -265,9 +261,18 @@ if __name__ == '__main__':
     else:
         swa_model, swa_scheduler = None, None
     Scaler = torch.amp.GradScaler(device=device)
+
+    if args.kaggle:
+        checkpoint_dir = '/kaggle/working/model-based-data-augmentation/trained_models'
+    else:
+        checkpoint_dir = '../trained_models'
+
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    checkpoint_save_path = os.path.join(checkpoint_dir, f'checkpoint_{args.experiment}.pt')
+
     Checkpointer = utils.Checkpoint(args.combine_train_corruptions, args.dataset, args.modeltype, args.experiment,
                                     train_corruptions, args.run, earlystopping=args.earlystop, patience=args.earlystopPatience,
-                                    verbose=False,  checkpoint_path=f'../trained_models/checkpoint_{args.experiment}.pt')
+                                    verbose=False,  checkpoint_path=checkpoint_save_path)
     Traintracker = utils.TrainTracking(args.dataset, args.modeltype, args.lrschedule, args.experiment, args.run,
                             args.validonc, args.validonadv, args.swa)
 
