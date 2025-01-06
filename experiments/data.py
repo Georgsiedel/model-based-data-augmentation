@@ -368,7 +368,8 @@ class DataLoading():
         self.kaggle = kaggle
 
         if self.kaggle:
-            with open('kaggle_path.json', 'r') as f:
+            file_path = os.path.join(os.path.dirname(__file__), 'kaggle_path.json')
+            with open(file_path, 'r') as f:
                 self.path = json.load(f)
                 self.gen_path = self.path.get(f'{self.dataset}-gen')
                 self.corrupt_path = self.path.get(f'{self.dataset}-C')

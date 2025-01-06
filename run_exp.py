@@ -7,7 +7,7 @@ if __name__ == '__main__':
     os.environ["CUDA_LAUNCH_BLOCKING"] = "1" #prevents "CUDA error: unspecified launch failure" and is recommended for some illegal memory access errors #increases train time by ~5-15%
     #os.environ["CUDA_VISIBLE_DEVICES"] = "1" #this blocks the spawn of multiple workers
 
-    for experiment in [12]:
+    for experiment in [0]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -24,7 +24,7 @@ if __name__ == '__main__':
             print("Training run #",run)
             if config.combine_train_corruptions:
                 print('Combined training')
-                cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
+                cmd0 = f"python ./experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
                        f"{config.epochs} --learningrate={config.learningrate} --dataset={config.dataset} --validontest=" \
                        f"{config.validontest} --lrschedule={config.lrschedule} --lrparams=\"{config.lrparams}\" " \
                        f"--earlystop={config.earlystop} --earlystopPatience={config.earlystopPatience} --optimizer=" \

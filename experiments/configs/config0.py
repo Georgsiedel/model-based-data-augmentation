@@ -20,7 +20,7 @@ kaggle = True # To run the experiments on Kaggle, set this to True
 
 batchsize = 512
 minibatchsize = 8
-dataset = 'CIFAR100' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
+dataset = 'CIFAR10' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
 generated_ratio = 0.5
 normalize = True
 validontest = True
