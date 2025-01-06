@@ -152,6 +152,8 @@ class Checkpoint:
                 f'{train_corruption["noise_type"]}_eps_{train_corruption["epsilon"]}_'
                 f'{train_corruption["sphere"]}_run_{run}.pth'
             )
+        
+        os.makedirs(os.path.dirname(self.final_model_path), exist_ok=True)
 
 
 
