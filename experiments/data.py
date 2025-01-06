@@ -597,11 +597,14 @@ class DataLoading():
 
         c_datasets = []
         #c-corruption benchmark: https://github.com/hendrycks/robustness
-        corruptions_c = np.asarray(np.loadtxt(os.path.abspath('../data/c-labels.txt'), dtype=list)) # CHANGE for Kaggle
+        current_dir = os.path.dirname(__file__)
+        c_path = os.path.join(current_dir, '../data/c-labels.txt')
+        corruptions_c = np.asarray(np.loadtxt(c_path, dtype=list)) # CHANGE for Kaggle
 
         if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
             #c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
-            corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-cifar.txt'), dtype=list)) # CHANGE for Kaggle
+            c_bar_path = os.path.join(current_dir, '../data/c-bar-labels-cifar.txt')
+            corruptions_bar = np.asarray(np.loadtxt(c_bar_path, dtype=list)) # CHANGE for Kaggle
             corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
 
             for corruption, set in corruptions:
