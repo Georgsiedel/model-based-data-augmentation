@@ -9,7 +9,6 @@ if module_path not in sys.path:
 import argparse
 import importlib
 import torch.multiprocessing as mp
-
 import numpy as np
 from tqdm import tqdm
 import torch.amp
@@ -27,12 +26,8 @@ from eval_corruptions import compute_c_corruptions
 from eval_adversarial import fast_gradient_validation
 
 import torch.backends.cudnn as cudnn
-torch.cuda.empty_cache()
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-#torch.backends.cudnn.enabled = False #this may resolve some cuDNN errors, but increases training time by ~200%
+from run_exp import device
 if torch.cuda.is_available():
-    #torch.cuda.set_device(0)
     cudnn.benchmark = False #this slightly speeds up 32bit precision training (5%). False helps achieve reproducibility
     cudnn.deterministic = True
 
@@ -254,7 +249,7 @@ if __name__ == '__main__':
         scheduler = optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmupscheduler, scheduler], milestones=[args.warmupepochs])
 
     if args.swa['apply'] == True:
-        swa_model = AveragedModel(model)#.module
+        swa_model = AveragedModel(model)
         swa_start = args.epochs * args.swa['start_factor']
         swa_scheduler = SWALR(optimizer, anneal_strategy="linear", anneal_epochs=5, swa_lr=args.learningrate * args.swa['lr_factor'])
     else:
@@ -296,7 +291,7 @@ if __name__ == '__main__':
                 valid_acc, valid_loss, valid_acc_robust, valid_acc_adv = valid_epoch(pbar, model)
 
                 if args.swa['apply'] == True and (epoch + 1) > swa_start:
-                    swa_model.update_parameters(model) #.module
+                    swa_model.update_parameters(model)
                     swa_scheduler.step()
                     valid_acc_swa, valid_loss_swa, valid_acc_robust_swa, valid_acc_adv_swa = valid_epoch(pbar, swa_model)
                 else:

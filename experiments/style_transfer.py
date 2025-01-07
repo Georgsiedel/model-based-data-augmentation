@@ -17,16 +17,7 @@ import torch.nn as nn
 import torchvision.transforms.v2 as transforms
 import adaIN.model as adaINmodel
 import adaIN.utils as utils
-
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-    if torch.cuda.device_count() >= 2:
-        nst_device = torch.device('cuda') #'cuda:1'
-    else:
-        nst_device = torch.device('cuda')
-else:
-    device = torch.device('cpu')
-    nst_device = torch.device('cpu')
+from run_exp import device as nst_device
 
 encoder_rel_path = 'adaIN/vgg_normalised.pth'
 decoder_rel_path = 'adaIN/decoder.pth'

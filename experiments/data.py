@@ -13,7 +13,7 @@ from torch.utils.data import Subset, Dataset, ConcatDataset, RandomSampler, Batc
 import numpy as np
 import style_transfer
 import experiments.custom_transforms as custom_transforms
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+from run_exp import device
 
 def normalization_values(batch, dataset, normalized, manifold=False, manifold_factor=1):
 
@@ -377,21 +377,6 @@ class DataLoading():
         c224 = transforms.CenterCrop(224)
         rrc224 = transforms.RandomResizedCrop(224, antialias=True)
         re = transforms.RandomErasing(p=RandomEraseProbability, scale=(0.02, 0.4)) #, value='random' --> normally distributed and out of bounds 0-1
-        TAc = custom_transforms.CustomTA_color()
-        TAg = custom_transforms.CustomTA_geometric()
-
-        def stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0):
-            vgg, decoder = style_transfer.load_models()
-            style_feats = style_transfer.load_feat_files()
-            pixels = 224 if self.dataset=='ImageNet' else 32 * self.factor
-
-            Stylize = style_transfer.NSTTransform(style_feats, vgg, decoder, alpha_min=alpha_min, alpha_max=alpha_max, probability=probability, pixels=pixels)
-            return Stylize
-
-        def transform_not_found(train_aug_strat, dataset):
-            print('Training augmentation strategy', train_aug_strat, 'could not be found. Proceeding without '
-                                                                        'augmentation strategy for.', dataset, '.')
-            return transforms.Compose([self.transforms_preprocess, re]), None, None
 
         # transformations of validation/test set and necessary transformations for training
         # always done (even for clean images while training, when using robust loss)
@@ -409,87 +394,8 @@ class DataLoading():
             self.transforms_basic = transforms.Compose([flip, c64])
         else:
             self.transforms_basic = transforms.Compose([flip])
-
-        transform_map = { #this contain a tuple each, defining the CPU transforms later applied in the dataloader and if needed GPU transforms later applied on the batch
-            "TAorRE": (custom_transforms.RandomChoiceTransforms([TAc,
-                                            TAg,
-                                            transforms.RandomErasing(p=1.0, scale=(0.02, 0.4), value='random'),
-                                            transforms.RandomErasing(p=1.0, scale=(0.02, 0.4), value=0)],
-                                        [0.4,0.3,0.15,0.15]),
-                            None,
-                            None),
-            "TAc+TAg+RE": (transforms.Compose([TAc, TAg, re]),
-                            None,
-                            None),
-            "TAc+TAgorRE": (transforms.Compose([TAc,
-                                        custom_transforms.RandomChoiceTransforms([TAg,
-                                                                transforms.RandomErasing(p=1.0, scale=(0.02, 0.4), value='random'),
-                                                                transforms.RandomErasing(p=1.0, scale=(0.02, 0.4), value=0)],
-                                        [6, 1, 1])]),
-                            None,
-                            None),
-            "TAc+REorTAg": (custom_transforms.RandomChoiceTransforms([TAg,
-                                                    transforms.Compose([TAc, transforms.RandomErasing(p=0.525, scale=(0.02, 0.4), value='random')])],
-                            [6, 8]),
-                            None,
-                            None),
-            "StyleTransfer": transforms.Compose([stylization(probability=0.95, alpha_min=0.0, alpha_max=0.3), re]),
-            "TAorStyle0.75": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.75, batch_size=50, transform_style=stylization(probability=0.95, alpha_min=0.0, alpha_max=0.3)), 
-                             re,
-                             transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
-            "TAorStyle0.5": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(probability=0.95, alpha_min=0.0, alpha_max=0.3)), 
-                             re,
-                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
-            "TAorStyle0.25": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.25, batch_size=50, transform_style=stylization(probability=0.95, alpha_min=0.0, alpha_max=0.3)), 
-                             re,
-                             transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
-            "TAorStyle0.1": (custom_transforms.DatasetStyleTransforms(stylized_ratio=0.1, batch_size=50, transform_style=stylization(probability=0.95, alpha_min=0.0, alpha_max=0.3)), 
-                             re,
-                             transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
-            "StyleAndTA": (custom_transforms.StylizedChoiceTransforms(transforms={"before_stylization": custom_transforms.EmptyTransforms(), 
-                                                        "before_no_stylization": custom_transforms.EmptyTransforms()}, 
-                                                        probabilities={"before_stylization_probability": 1.0, 
-                                                        "before_no_stylization_probability": 0.0}),
-                                stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0),
-                              transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
-            "weakerStyleAndTA": (custom_transforms.StylizedChoiceTransforms(transforms={"before_stylization": custom_transforms.EmptyTransforms(), 
-                                                        "before_no_stylization": custom_transforms.EmptyTransforms()}, 
-                                                        probabilities={"before_stylization_probability": 1.0, 
-                                                        "before_no_stylization_probability": 0.0}),
-                                stylization(probability=0.95, alpha_min=0.1, alpha_max=0.2),
-                              transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),                                              
-            "Style0.5AndTA": (custom_transforms.StylizedChoiceTransforms(transforms={"before_stylization": custom_transforms.EmptyTransforms(), 
-                                                        "before_no_stylization": transforms.Compose([transforms_v2.TrivialAugmentWide(), re])}, 
-                                                        probabilities={"before_stylization_probability": 0.5, 
-                                                        "before_no_stylization_probability": 0.5}),
-                                stylization(probability=0.95, alpha_min=0.2, alpha_max=1.0),
-                              transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
-            "TrivialAugmentWide": (None,
-                            None,
-                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
-            "RandAugment": (transforms.Compose([transforms_v2.RandAugment(), re]),
-                            None,
-                            None),
-            "AutoAugment": (transforms.Compose([transforms_v2.AutoAugment(), re]),
-                            None,
-                            None),
-            "AugMix": (transforms.Compose([transforms_v2.AugMix(), re]),
-                       None,
-                       None),
-            'None': (None, 
-                     re,
-                     re),
-        }
-
-        
-        self.stylization_orig, self.transforms_orig_after_style, self.transforms_orig_after_nostyle = (transform_map[train_aug_strat_orig]
-            if train_aug_strat_orig in transform_map
-            else transform_not_found(train_aug_strat_orig, 'transforms_original'))
-
-        self.stylization_gen, self.transforms_gen_after_style, self.transforms_gen_after_nostyle = (transform_map[train_aug_strat_gen]
-                                        if train_aug_strat_gen in transform_map
-                                        else transform_not_found(train_aug_strat_gen, 'transforms_generated'))
-        
+        self.stylization_orig, self.transforms_orig_after_style, self.transforms_orig_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_orig, re, self.dataset, self.factor)
+        self.stylization_gen, self.transforms_gen_after_style, self.transforms_gen_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_gen, re, self.dataset, self.factor)
 
     def load_base_data(self, validontest, run=0):
 

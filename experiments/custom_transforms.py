@@ -4,13 +4,152 @@ import torch.cuda.amp
 import torch.utils
 import torch.utils.data
 import torchvision.transforms.v2 as transforms_v2
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+import torchvision.transforms as transforms
+from run_exp import device
 
 import torch
 from torchvision.transforms import ToTensor, ToPILImage
 import numpy as np
 import time
 from experiments.utils import plot_images
+import experiments.style_transfer as style_transfer
+
+
+def get_transforms_map(strat_name, re, dataset, factor):
+    TAc = CustomTA_color()
+    TAg = CustomTA_geometric()
+
+    def stylization(dataset, factor, probability=0.95, alpha_min=0.2, alpha_max=1.0):
+        def lazy():
+            vgg, decoder = style_transfer.load_models()
+            style_feats = style_transfer.load_feat_files()
+            stylization_prob = probability
+            pixels = 224 if dataset=='ImageNet' else 32 * factor
+
+            return style_transfer.NSTTransform(style_feats, vgg, decoder, alpha_min=alpha_min, alpha_max=alpha_max, probability=stylization_prob, pixels=pixels)
+        return lazy
+
+    transform_map = { #this contain a tuple each, defining the CPU transforms later applied in the dataloader and if needed GPU transforms later applied on the batch
+        "StyleTransferalpha00": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.0, alpha_max=0.0)), 
+                            re,
+                            re),    
+        "StyleTransferalpha02": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.2, alpha_max=0.2)), 
+                            re,
+                            re), 
+        "StyleTransferalpha04": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.4, alpha_max=0.4)), 
+                            re,
+                            re),    
+        "StyleTransferalpha06": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.6, alpha_max=0.6)), 
+                            re,
+                            re), 
+        "StyleTransferalpha08": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.8, alpha_max=0.8)), 
+                            re,
+                            re), 
+        "StyleTransferalpha10": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=1.0, alpha_max=1.0)), 
+                            re,
+                            re), 
+        "StyleTransfer100": (DatasetStyleTransforms(stylized_ratio=1.0, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            re),
+        "StyleTransfer90": (DatasetStyleTransforms(stylized_ratio=0.9, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            re),
+        "StyleTransfer80": (DatasetStyleTransforms(stylized_ratio=0.8, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            re),
+        "StyleTransfer70": (DatasetStyleTransforms(stylized_ratio=0.7, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            re),
+        "StyleTransfer60": (DatasetStyleTransforms(stylized_ratio=0.6, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            re),     
+        "StyleTransfer50": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            re),    
+        "StyleTransfer40": (DatasetStyleTransforms(stylized_ratio=0.4, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            re),     
+        "StyleTransfer30": (DatasetStyleTransforms(stylized_ratio=0.3, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            re),     
+        "StyleTransfer20": (DatasetStyleTransforms(stylized_ratio=0.2, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            re),     
+        "StyleTransfer10": (DatasetStyleTransforms(stylized_ratio=0.1, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            re),                                                               
+        "TAorStyle90": (DatasetStyleTransforms(stylized_ratio=0.9, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+        "TAorStyle80": (DatasetStyleTransforms(stylized_ratio=0.8, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                        transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+        "TAorStyle70": (DatasetStyleTransforms(stylized_ratio=0.7, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+        "TAorStyle60": (DatasetStyleTransforms(stylized_ratio=0.6, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+        "TAorStyle50": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+        "TAorStyle40": (DatasetStyleTransforms(stylized_ratio=0.4, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                        transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+        "TAorStyle30": (DatasetStyleTransforms(stylized_ratio=0.3, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+        "TAorStyle20": (DatasetStyleTransforms(stylized_ratio=0.2, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+        "TAorStyle10": (DatasetStyleTransforms(stylized_ratio=0.1, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            re,
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+        "StyleAndTA": (DatasetStyleTransforms(stylized_ratio=1.0, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re]),
+                            transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),               
+        "StyleorColorAndGeometricOrRE": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=0.95, alpha_min=0.1, alpha_max=1.0)), 
+                            RandomChoiceTransforms([TAg,
+                                        transforms_v2.RandomErasing(p=1.0, scale=(0.02, 0.4), value='random'),
+                                        transforms_v2.RandomErasing(p=1.0, scale=(0.02, 0.4), value=0)],
+                                    [0.7,0.15,0.15]),
+                            transforms.Compose([TAc, RandomChoiceTransforms([TAg,
+                                        transforms_v2.RandomErasing(p=1.0, scale=(0.02, 0.4), value='random'),
+                                        transforms_v2.RandomErasing(p=1.0, scale=(0.02, 0.4), value=0)],
+                                    [0.7,0.15,0.15])])),                                  
+        "TAorRE": (None,
+                        None,
+                        RandomChoiceTransforms([transforms_v2.TrivialAugmentWide(),
+                                        transforms_v2.RandomErasing(p=1.0, scale=(0.02, 0.4), value='random'),
+                                        transforms_v2.RandomErasing(p=1.0, scale=(0.02, 0.4), value=0)],
+                                    [0.8,0.1,0.1])),
+        "TrivialAugmentWide": (None,
+                        None,
+                        transforms.Compose([transforms_v2.TrivialAugmentWide(), re])),
+        "RandAugment": (transforms.Compose([transforms_v2.RandAugment(), re]),
+                        None,
+                        None),
+        "AutoAugment": (transforms.Compose([transforms_v2.AutoAugment(), re]),
+                        None,
+                        None),
+        "AugMix": (transforms.Compose([transforms_v2.AugMix(), re]),
+                    None,
+                    None),
+        'None': (None, 
+                    re,
+                    re),
+        }
+    
+    def transform_not_found(name):
+        print('Training augmentation strategy', name, 'could not be found. Proceeding without augmentation strategy.')
+        return None, re, re
+
+    transforms_stylization, transforms_after_style, transforms_after_nostyle = (transform_map[strat_name]
+    if strat_name in transform_map
+    else transform_not_found(strat_name))
+
+    return transforms_stylization, transforms_after_style, transforms_after_nostyle
+
 
 class DatasetStyleTransforms:
     def __init__(self, stylized_ratio, batch_size, transform_style):
@@ -37,6 +176,8 @@ class DatasetStyleTransforms:
             updated_dataset: Updated dataset with stylized images.
             transformed_flags: Boolean list indicating which images were transformed.
         """
+        if callable(self.transform_style):
+            self.transform_style = self.transform_style()
 
         if isinstance(dataset, torch.utils.data.Subset):
             # Handle PyTorch Subset
@@ -96,7 +237,6 @@ class DatasetStyleTransforms:
         # Return updated dataset and transformation flags
 
         return updated_dataset, style_mask
-
 
 class RandomChoiceTransforms:
     def __init__(self, transforms, p):
