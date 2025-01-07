@@ -226,7 +226,7 @@ class GroupedAugmentedDataset(torch.utils.data.Dataset):
         x, y = self.cached_dataset[idx]
 
         #augment iterably
-        #augment = transforms.Compose([self.transforms_basic, self.transforms_iter_orig])
+        augment = transforms.Compose([self.transforms_basic, self.transforms_iter_orig])
         
         if self.robust_samples == 0:
             return augment(x), y
