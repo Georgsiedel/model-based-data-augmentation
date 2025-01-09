@@ -12,7 +12,7 @@ class Block(nn.Module):
     '''Grouped convolution block.'''
     expansion = 2
 
-    def __init__(self, in_planes, cardinality=32, bottleneck_width=4, stride=1, activation_function=F.relu):
+    def __init__(self, in_planes, cardinality=32, bottleneck_width=4, stride=1):
         super(Block, self).__init__()
         group_width = cardinality * bottleneck_width
         self.conv1 = nn.Conv2d(in_planes, group_width, kernel_size=1, bias=False)
@@ -21,7 +21,6 @@ class Block(nn.Module):
         self.bn2 = nn.BatchNorm2d(group_width)
         self.conv3 = nn.Conv2d(group_width, self.expansion*group_width, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(self.expansion*group_width)
-        self.activation_function = activation_function
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != self.expansion*group_width:
@@ -31,39 +30,37 @@ class Block(nn.Module):
             )
 
     def forward(self, x):
-        out = self.activation_function(self.bn1(self.conv1(x)))
-        out = self.activation_function(self.bn2(self.conv2(out)))
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = F.relu(self.bn2(self.conv2(out)))
         out = self.bn3(self.conv3(out))
         out += self.shortcut(x)
-        out = self.activation_function(out)
+        out = F.relu(out)
         return out
 
 
 class ResNeXt(ct_model.CtModel):
-    activation_function: object
 
-    def __init__(self, num_blocks, cardinality, bottleneck_width, dataset, normalized, num_classes=10, factor=1, activation_function='relu'):
+    def __init__(self, num_blocks, cardinality, bottleneck_width, dataset, normalized, num_classes=10, factor=1):
         super(ResNeXt, self).__init__(dataset=dataset, normalized=normalized, num_classes=num_classes)
         self.cardinality = cardinality
         self.bottleneck_width = bottleneck_width
         self.in_planes = 64
         self.factor = factor
-        self.activation_function = getattr(F, activation_function)
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
-        self.layer1 = self._make_layer(num_blocks[0], factor, self.activation_function)
-        self.layer2 = self._make_layer(num_blocks[1], 2, self.activation_function)
-        self.layer3 = self._make_layer(num_blocks[2], 2, self.activation_function)
+        self.layer1 = self._make_layer(num_blocks[0], factor)
+        self.layer2 = self._make_layer(num_blocks[1], 2)
+        self.layer3 = self._make_layer(num_blocks[2], 2)
         # self.layer4 = self._make_layer(num_blocks[3], 2)
         self.linear = nn.Linear(cardinality*bottleneck_width*8, num_classes)
-        self.blocks = [nn.Sequential(self.activation_function, self.conv1, self.bn1), self.layer1, self.layer2, self.layer3]
+        self.blocks = [nn.Sequential(self.conv1, self.bn1, torch.nn.ReLU()), self.layer1, self.layer2, self.layer3]
 
-    def _make_layer(self, num_blocks, stride, activation_function):
+    def _make_layer(self, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
-            layers.append(Block(self.in_planes, self.cardinality, self.bottleneck_width, stride, activation_function))
+            layers.append(Block(self.in_planes, self.cardinality, self.bottleneck_width, stride))
             self.in_planes = Block.expansion * self.cardinality * self.bottleneck_width
         # Increase bottleneck_width by 2 after each stage.
         self.bottleneck_width *= 2
@@ -88,21 +85,21 @@ class ResNeXt(ct_model.CtModel):
             return out
 
 
-def ResNeXt29_2x64d(dataset, normalized, num_classes, factor, activation_function='relu'):
+def ResNeXt29_2x64d(dataset, normalized, num_classes, factor):
     return ResNeXt(num_blocks=[3,3,3], cardinality=2, bottleneck_width=64, dataset=dataset, normalized=normalized,
-                   num_classes=num_classes, factor=factor, activation_function=activation_function)
+                   num_classes=num_classes, factor=factor)
 
-def ResNeXt29_4x64d(dataset, normalized, num_classes, factor, activation_function='relu'):
+def ResNeXt29_4x64d(dataset, normalized, num_classes, factor):
     return ResNeXt(num_blocks=[3,3,3], cardinality=4, bottleneck_width=64, dataset=dataset, normalized=normalized,
-                   num_classes=num_classes, factor=factor, activation_function=activation_function)
+                   num_classes=num_classes, factor=factor)
 
-def ResNeXt29_8x64d(dataset, normalized, num_classes, factor, activation_function='relu'):
+def ResNeXt29_8x64d(dataset, normalized, num_classes, factor):
     return ResNeXt(num_blocks=[3,3,3], cardinality=8, bottleneck_width=64, dataset=dataset, normalized=normalized,
-                   num_classes=num_classes, factor=factor, activation_function=activation_function)
+                   num_classes=num_classes, factor=factor)
 
-def ResNeXt29_32x4d(dataset, normalized, num_classes, factor, activation_function='relu'):
+def ResNeXt29_32x4d(dataset, normalized, num_classes, factor):
     return ResNeXt(num_blocks=[3,3,3], cardinality=32, bottleneck_width=4, dataset=dataset, normalized=normalized,
-                   num_classes=num_classes, factor=factor, activation_function=activation_function)
+                   num_classes=num_classes, factor=factor)
 
 def test_resnext():
     net = ResNeXt29_2x64d()
