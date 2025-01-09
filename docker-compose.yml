@@ -14,7 +14,8 @@ services:
       - /home/siedel/data:/data
       - /home/siedel/trained_models:/trained_models
       - ./results:/workspace/results
-    command: python run_exp.py  # Run the main script for this container
+    command: ["taskset", "-c", "0-7", "/bin/bash"]
+    #command: python run_exp.py  # Run the main script for this container
     tty: true
 
   python-gpu-container-gpu1:
@@ -22,18 +23,24 @@ services:
       service: python-gpu-container-gpu0
     environment:
       NVIDIA_VISIBLE_DEVICES: "1"  # Restrict to GPU 1
-    command: python run_exp_1.py  # Run a different script for this container
+    command: ["taskset", "-c", "8-15", "/bin/bash"]
+    #command: python run_exp_1.py  # Run a different script for this container
+    tty: true
 
   python-gpu-container-gpu2:
     extends:
       service: python-gpu-container-gpu0
     environment:
       NVIDIA_VISIBLE_DEVICES: "2"  # Restrict to GPU 2
-    command: python run_exp_2.py  # Run a different script for this container
+    command: ["taskset", "-c", "16-23", "/bin/bash"]
+    #command: python run_exp_2.py  # Run a different script for this container
+    tty: true
 
   python-gpu-container-gpu3:
     extends:
       service: python-gpu-container-gpu0
     environment:
       NVIDIA_VISIBLE_DEVICES: "3"  # Restrict to GPU 3
-    command: python run_exp_3.py  # Run a different script for this container
+    command: ["taskset", "-c", "24-31", "/bin/bash"] 
+    #command: python run_exp_3.py  # Run a different script for this container
+    tty: true
