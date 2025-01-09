@@ -1,15 +1,15 @@
 import numpy as np
 
 train_corruptions = np.array([
-{'noise_type': 'standard', 'epsilon': 0.0, 'sphere': False, 'distribution': 'beta2-5'},
-#{'noise_type': 'uniform-linf', 'epsilon': 0.1, 'sphere': False, 'distribution': 'uniform'},
-#{'noise_type': 'uniform-l0.5', 'epsilon': 400000.0, 'sphere': False, 'distribution': 'uniform'},
-#{'noise_type': 'uniform-l1', 'epsilon': 200.0, 'sphere': False, 'distribution': 'uniform'},
-#{'noise_type': 'uniform-l2', 'epsilon': 5.0, 'sphere': False, 'distribution': 'uniform'},
-#{'noise_type': 'uniform-l0-impulse', 'epsilon': 0.2, 'sphere': False, 'distribution': 'uniform'},
+#{'noise_type': 'standard', 'epsilon': 0.0, 'sphere': False, 'distribution': 'beta2-5'},
+{'noise_type': 'uniform-linf', 'epsilon': 0.1, 'sphere': False, 'distribution': 'uniform'},
+{'noise_type': 'uniform-l0.5', 'epsilon': 400000.0, 'sphere': False, 'distribution': 'uniform'},
+{'noise_type': 'uniform-l1', 'epsilon': 200.0, 'sphere': False, 'distribution': 'uniform'},
+{'noise_type': 'uniform-l2', 'epsilon': 5.0, 'sphere': False, 'distribution': 'uniform'},
+{'noise_type': 'uniform-l0-impulse', 'epsilon': 0.2, 'sphere': False, 'distribution': 'uniform'},
 ])
 noise_sparsity = 1.0
-noise_patch_scale = {'lower': 0.2, 'upper': 0.7}
+noise_patch_scale = {'lower': 0.2, 'upper': 1.0}
 combine_train_corruptions = True #augment the train dataset with all corruptions
 concurrent_combinations = 1 #only has an effect if combine_train_corruption is True
 
@@ -21,10 +21,10 @@ normalize = True
 validontest = True
 validonc = True
 validonadv = False
-lrschedule = 'CosineAnnealingLR'
+lrschedule = 'CosineAnnealingWarmRestarts'
 learningrate = 0.1
-epochs = 200
-lrparams = {'T_max': 200}
+epochs = 300
+lrparams = {'T_0': 20, 'T_mult': 2}
 warmupepochs = 0
 earlystop = False
 earlystopPatience = 15
@@ -35,8 +35,8 @@ modeltype = 'WideResNet_28_4'
 modelparams = {'dropout_rate': 0.2, 'activation_function': 'silu'}
 resize = False
 aug_strat_check = True
-train_aug_strat_orig = 'TAorStyle0.1' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
-train_aug_strat_gen = 'TAorStyle0.25' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+train_aug_strat_orig = 'TrivialAugmentWide' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+train_aug_strat_gen = 'TrivialAugmentWide' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 loss = 'CrossEntropyLoss'
 lossparams = {'label_smoothing': 0.1}
 trades_loss = False

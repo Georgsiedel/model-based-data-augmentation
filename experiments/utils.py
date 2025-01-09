@@ -37,16 +37,23 @@ class str2dictAction(argparse.Action):
 import matplotlib.pyplot as plt
 import torch
 
-def plot_images(images, corrupted_images, number, mean, std):
+def plot_images(number, mean, std, images, corrupted_images = None, second_corrupted_images = None):
     images = images * std + mean
     corrupted_images = corrupted_images * std + mean
     
     # Define a consistent figure size for each row of images
-    row_height = 1.5  # Height per row
-    col_width = 1.5   # Width per column
-    fig, axs = plt.subplots(number, 2, figsize=(2 * col_width, number * row_height), squeeze=False)
+    row_height = 1.0  # Height per row
+    col_width = 1.0   # Width per column
+    columns = 1
+    if corrupted_images is not None:
+        columns = 2
+        if second_corrupted_images is not None:
+            columns = 3
+    fig, axs = plt.subplots(number, columns, figsize=(2 * col_width, number * row_height), squeeze=False)
     
-    images, corrupted_images = images.cpu(), corrupted_images.cpu()
+    images = images.cpu()
+    corrupted_images = corrupted_images.cpu() if corrupted_images is not None else corrupted_images
+    second_corrupted_images = second_corrupted_images.cpu() if second_corrupted_images is not None else second_corrupted_images
     
     for i in range(number):
         image = images[i]
@@ -55,11 +62,19 @@ def plot_images(images, corrupted_images, number, mean, std):
         axs[i, 0].imshow(image)
         axs[i, 0].axis('off')  # Turn off axes for cleaner visualization
         
-        corrupted_image = corrupted_images[i]
-        corrupted_image = torch.squeeze(corrupted_image)
-        corrupted_image = corrupted_image.permute(1, 2, 0)
-        axs[i, 1].imshow(corrupted_image)
-        axs[i, 1].axis('off')  # Turn off axes for cleaner visualization
+        if corrupted_images is not None:
+            corrupted_image = corrupted_images[i]
+            corrupted_image = torch.squeeze(corrupted_image)
+            corrupted_image = corrupted_image.permute(1, 2, 0)
+            axs[i, 1].imshow(corrupted_image)
+            axs[i, 1].axis('off')  # Turn off axes for cleaner visualization
+        
+        if second_corrupted_images is not None:
+            second_corrupted_image = second_corrupted_images[i]
+            second_corrupted_image = torch.squeeze(second_corrupted_image)
+            second_corrupted_image = second_corrupted_image.permute(1, 2, 0)
+            axs[i, 2].imshow(second_corrupted_image)
+            axs[i, 2].axis('off')  # Turn off axes for cleaner visualization
 
     plt.tight_layout()  # Adjust layout to prevent overlapping
     plt.show()

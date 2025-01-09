@@ -31,7 +31,7 @@ class CtModel(nn.Module):
 
         #define where mixup is applied. k=0 is in the input space, k>0 is in the embedding space (manifold mixup)
         if self.training == False: k = -1
-        elif mixup_alpha > 0.0 and manifold == True: k = np.random.choice(range(3), 1)[0] #, p=[0.5, 0.25, 0.25]
+        elif manifold == True: k = np.random.choice(range(3), 1)[0]
         else: k = 0
 
         if k == 0:  # Do input mixup if k is 0
@@ -43,7 +43,7 @@ class CtModel(nn.Module):
                                                             noise_patch_lower_scale=noise_patch_lower_scale,
                                                             noise_patch_upper_scale=noise_patch_upper_scale)
             out = noisy_out
-            #plot_images(noisy_out, noisy_out, 4, self.mean, self.std)
+            #plot_images(4, self.mean, self.std, noisy_out, noisy_out)
 
         out = self.blocks[0](out)
 
@@ -52,7 +52,7 @@ class CtModel(nn.Module):
             if k == (i + 1):  # Do manifold mixup if k is greater 0
                 out, targets = mixup_process(out, targets, robust_samples, self.num_classes, mixup_alpha, mixup_p,
                                          cutmix_alpha, cutmix_p, generated_ratio, manifold=True, inplace=False)
-                out = noise_up(out, robust_samples=robust_samples, add_noise_level=1.0, mult_noise_level=0.5,
-                                        sparse_level=noise_sparsity, l0_level=0.0)
+                out = noise_up(out, robust_samples=robust_samples, add_noise_level=0.5, mult_noise_level=0.5,
+                                        sparse_level=0.65, l0_level=0.0)
         return out, targets
 

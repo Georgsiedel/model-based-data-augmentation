@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 from torchmetrics.classification import MulticlassCalibrationError
-device = "cuda" if torch.cuda.is_available() else "cpu"
+from run_exp import device
 from noise import apply_noise
 from utils import plot_images
 
