@@ -551,7 +551,7 @@ class DataLoading():
 
         self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
                                       num_workers=number_workers, worker_init_fn=seed_worker, 
-                                        generator=g)
+                                        generator=g, persistent_workers=True)
 
         self.validationloader = DataLoader(self.validset, batch_size=batchsize, pin_memory=False, num_workers=0)
 
@@ -566,5 +566,5 @@ class DataLoading():
         g.manual_seed(self.epoch + self.epochs * self.run)
         self.trainloader = DataLoader(self.trainset, batch_sampler=self.CustomSampler, pin_memory=True, 
                                       num_workers=self.number_workers, worker_init_fn=seed_worker,
-                                      generator=g)
+                                      generator=g, persistent_workers=True)
         return self.trainloader

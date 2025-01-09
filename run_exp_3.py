@@ -17,7 +17,7 @@ if __name__ == '__main__':
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
         runs = 1
         
-        if experiment in [24]:
+        if experiment in []:
             resume = True
         else:
             resume = False
