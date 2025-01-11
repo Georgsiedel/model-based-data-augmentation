@@ -1,5 +1,5 @@
 import torch
-device = "cuda" if torch.cuda.is_available() else "cpu"
+from run_exp import device
 import numpy as np
 from torch.utils.data import DataLoader
 from autoattack import AutoAttack

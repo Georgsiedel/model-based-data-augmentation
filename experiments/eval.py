@@ -14,8 +14,7 @@ import torch.utils.data
 from torchmetrics.classification import MulticlassCalibrationError
 import argparse
 import importlib
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
+from run_exp import device
 import models as low_dim_models
 import eval_adversarial
 import eval_corruptions

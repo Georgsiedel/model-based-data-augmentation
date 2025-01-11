@@ -73,9 +73,9 @@ class RandomMixup(torch.nn.Module):
         index_orig = torch.randperm(orig).cuda()
         for i in range(robust_samples+1):
             batch[q*i:q*i+orig] = lambda_param * batch[q*i:q*i+orig] + (1 - lambda_param) * batch[q*i:q*i+orig][index_orig]
-            #batch[q*i+orig:q*(i+1)] = lambda_param * batch[q*i+orig:q*(i+1)] + (1 - lambda_param) * batch[q*i+orig:q*(i+1)][index_gen]
+            batch[q*i+orig:q*(i+1)] = lambda_param * batch[q*i+orig:q*(i+1)] + (1 - lambda_param) * batch[q*i+orig:q*(i+1)][index_gen]
         target[:orig] = lambda_param * target[:orig] + (1 - lambda_param) * target[:orig][index_orig]
-        #target[orig:] = lambda_param * target[orig:] + (1 - lambda_param) * target[orig:][index_gen]
+        target[orig:] = lambda_param * target[orig:] + (1 - lambda_param) * target[orig:][index_gen]
 
         return batch, target
 
@@ -172,9 +172,9 @@ class RandomCutmix(torch.nn.Module):
         index_orig = torch.randperm(orig).cuda()
         for i in range(robust_samples+1):
             batch[q*i:q*i+orig, :, y1:y2, x1:x2] = batch[q*i:q*i+orig, :, y1:y2, x1:x2][index_orig]
-            #batch[q*i+orig:q*(i+1), :, y1:y2, x1:x2] = batch[q*i+orig:q*(i+1), :, y1:y2, x1:x2][index_gen]
+            batch[q*i+orig:q*(i+1), :, y1:y2, x1:x2] = batch[q*i+orig:q*(i+1), :, y1:y2, x1:x2][index_gen]
         target[:orig] = lambda_param * target[:orig] + (1 - lambda_param) * target[:orig][index_orig]
-        #target[orig:] = lambda_param * target[orig:] + (1 - lambda_param) * target[orig:][index_gen]
+        target[orig:] = lambda_param * target[orig:] + (1 - lambda_param) * target[orig:][index_gen]
 
         return batch, target
 
