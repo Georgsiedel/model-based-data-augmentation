@@ -39,15 +39,16 @@ import torch
 
 def plot_images(number, mean, std, images, corrupted_images = None, second_corrupted_images = None):
     images = images * std + mean
-    corrupted_images = corrupted_images * std + mean
     
     # Define a consistent figure size for each row of images
     row_height = 1.0  # Height per row
     col_width = 1.0   # Width per column
     columns = 1
     if corrupted_images is not None:
+        corrupted_images = corrupted_images * std + mean
         columns = 2
         if second_corrupted_images is not None:
+            second_corrupted_images = second_corrupted_images * std + mean
             columns = 3
     fig, axs = plt.subplots(number, columns, figsize=(2 * col_width, number * row_height), squeeze=False)
     
