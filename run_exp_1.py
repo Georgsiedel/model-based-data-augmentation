@@ -8,7 +8,7 @@ if __name__ == '__main__':
 
     os.environ["CUDA_LAUNCH_BLOCKING"] = "1" #prevents "CUDA error: unspecified launch failure" and is recommended for some illegal memory access errors #increases train time by ~5-15%
 
-    for experiment in list(range(1,7)) + list(range(49,59)):
+    for experiment in list(range(47,52)):
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
-        if experiment in list(range(0,35)):
+        if experiment in list(range(47,52)):
             print('Beginning metric evaluation')
             cmdeval = "python experiments/eval.py --resume={} --experiment={} --runs={} --batchsize={} --dataset={} " \
                     "--modeltype={} --modelparams=\"{}\" --resize={} --combine_test_corruptions={} --number_workers={} " \
