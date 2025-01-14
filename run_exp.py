@@ -8,7 +8,7 @@ if __name__ == '__main__':
 
     os.environ["CUDA_LAUNCH_BLOCKING"] = "1" #prevents "CUDA error: unspecified launch failure" and is recommended for some illegal memory access errors #increases train time by ~5-15%
 
-    for experiment in [26] + list(range(27,37)):
+    for experiment in list(range(35,37))+ list(range(77,82)) + [87,88]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -16,7 +16,7 @@ if __name__ == '__main__':
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
         runs = 1
         
-        if experiment in [26]:
+        if experiment in [35]:
             resume = True
         else:
             resume = False
@@ -72,15 +72,14 @@ if __name__ == '__main__':
 
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
-        if experiment in [26] + list(range(27,37)):
-            print('Beginning metric evaluation')
-            cmdeval = "python experiments/eval.py --resume={} --experiment={} --runs={} --batchsize={} --dataset={} " \
-                    "--modeltype={} --modelparams=\"{}\" --resize={} --combine_test_corruptions={} --number_workers={} " \
-                    "--normalize={} --pixel_factor={} --test_on_c={} --calculate_adv_distance={} --adv_distance_params=\"{}\" " \
-                    "--calculate_autoattack_robustness={} --autoattack_params=\"{}\" --combine_train_corruptions={} " \
-                    .format(resume, experiment, runs, 1000, config.dataset, config.modeltype, config.modelparams,
-                            config.resize, config.combine_test_corruptions, 0, config.normalize,
-                            config.pixel_factor, config.test_on_c, config.calculate_adv_distance, config.adv_distance_params,
-                            config.calculate_autoattack_robustness, config.autoattack_params, config.combine_train_corruptions)
-            os.system(cmdeval)
+        print('Beginning metric evaluation')
+        cmdeval = "python experiments/eval.py --resume={} --experiment={} --runs={} --batchsize={} --dataset={} " \
+                "--modeltype={} --modelparams=\"{}\" --resize={} --combine_test_corruptions={} --number_workers={} " \
+                "--normalize={} --pixel_factor={} --test_on_c={} --calculate_adv_distance={} --adv_distance_params=\"{}\" " \
+                "--calculate_autoattack_robustness={} --autoattack_params=\"{}\" --combine_train_corruptions={} " \
+                .format(resume, experiment, runs, 1000, config.dataset, config.modeltype, config.modelparams,
+                        config.resize, config.combine_test_corruptions, 0, config.normalize,
+                        config.pixel_factor, config.test_on_c, config.calculate_adv_distance, config.adv_distance_params,
+                        config.calculate_autoattack_robustness, config.autoattack_params, config.combine_train_corruptions)
+        os.system(cmdeval)
 
