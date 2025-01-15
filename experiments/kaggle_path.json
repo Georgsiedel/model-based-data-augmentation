@@ -1,6 +1,12 @@
 {
     "CIFAR10-C": "/kaggle/input/corrupt-data/CIFAR-10-C",
-    "CIFAR100-C": "/kaggle/input/cifar100-c/CIFAR-100-C",
     "CIFAR10-gen": "/kaggle/input/cifar10-1m-npz/1m.npz",
-    "CIFAR100-gen": "/kaggle/input/cifar-100-1m-generated/1m.npz"
+    "CIFAR10-C-bar": "",
+    "CIFAR100-C": "/kaggle/input/cifar100-c/CIFAR-100-C",
+    "CIFAR100-C-bar": "",
+    "CIFAR100-gen": "/kaggle/input/cifar-100-1m-generated/1m.npz",
+    "TinyImageNet": "/kaggle/input/tinyimagenet/TinyImageNet/",
+    "TinyImageNet-C": "/kaggle/input/tinyimagenet-c/TinyImageNet-c/",
+    "TinyImageNet-bar-C": "/kaggle/input/tinyimagenet-bar-c/TinyImageNet-c-bar",
+    "TinyImageNet-gen": ""
 }

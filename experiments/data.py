@@ -416,6 +416,8 @@ class DataLoading():
         # Trainset and Validset
         if self.test_only == False:
             if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
+                if self.kaggle:
+                    self.base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'kaggle/input/tinyimagenet/{self.dataset}/train')) # Only for TinyImageNet. For use in Kaggle
                 self.base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train')) 
             else:
                 load_helper = getattr(torchvision.datasets, self.dataset)
@@ -434,7 +436,7 @@ class DataLoading():
                 self.validset = list(map(self.transforms_preprocess, self.validset))
             else:
                 if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                    self.validset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/val'),
+                    self.validset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'kaggle/input/tinyimagenet/{self.dataset}/val'),
                                                                 transform=self.transforms_preprocess)
                 elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
                     load_helper = getattr(torchvision.datasets, self.dataset)
@@ -448,7 +450,7 @@ class DataLoading():
 
         #Testset
         if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-            self.testset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/val'),
+            self.testset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'kaggle/input/tinyimagenet/{self.dataset}/val'),
                                                         transform=self.transforms_preprocess)
         elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
             load_helper = getattr(torchvision.datasets, self.dataset)
@@ -516,12 +518,21 @@ class DataLoading():
             #c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
             c_bar_path = os.path.join(current_dir, '../data/c-bar-labels-cifar.txt')
             corruptions_bar = np.asarray(np.loadtxt(c_bar_path, dtype=list)) # CHANGE for Kaggle
-            corruptions = [(string, 'c') for string in corruptions_c] #+ [(string, 'c-bar') for string in corruptions_bar]
+            corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
 
             for corruption, set in corruptions:
                 subtestset = self.testset
                 if self.kaggle:
-                    np_data_c = np.load(os.path.abspath(f'{self.corrupt_path}/{corruption}.npy'))
+                    #np_data_c = np.concatenate(np.load(os.path.abspath(f'{self.corrupt_path}/{corruption}.npy')), np.load(os.path.abspath(f'{self.corrupt_path}-bar/{corruption}.npy')), axis=0)
+                    corrupt_file_dir = os.path.abspath(f'{self.corrupt_path}/{corruption}.npy')
+                    try:
+                        np_data_c = np.load(os.path.abspath(f'{self.corrupt_path}/{corruption}.npy'))
+                    except FileNotFoundError as e:
+                        try:
+                            np_data_c = np.load(os.path.abspath(f'{self.corrupt_path}-bar/{corruption}.npy'))
+                        except FileNotFoundError as e:
+                            raise FileNotFoundError(f"File '{corruption}.npy' not found in {corrupt_file_dir}") from e
+
                 else:
                     np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'))
                 np_data_c = np.array(np.array_split(np_data_c, 5))
