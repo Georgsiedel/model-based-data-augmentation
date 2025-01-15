@@ -376,10 +376,6 @@ class DataLoading():
                 self.corrupt_c_path = self.path.get(f'{self.dataset}-C')
                 self.corrupt_bar_path = self.path.get(f'{self.dataset}-C-bar')
             
-            if not self.gen_path or not self.corrupt_path:
-                raise KeyError(
-                    f"Missing keys for dataset '{self.dataset}' in kaggle_path.json."
-                )
 
     def create_transforms(self, train_aug_strat_orig, train_aug_strat_gen, RandomEraseProbability=0.0):
         # list of all data transformations used
