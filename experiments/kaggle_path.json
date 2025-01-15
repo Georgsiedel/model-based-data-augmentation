@@ -8,5 +8,5 @@
     "TinyImageNet": "/kaggle/input/tinyimagenet/TinyImageNet/",
     "TinyImageNet-C": "/kaggle/input/tinyimagenet-c/TinyImageNet-c/",
     "TinyImageNet-bar-C": "/kaggle/input/tinyimagenet-bar-c/TinyImageNet-c-bar",
-    "TinyImageNet-gen": ""
+    "TinyImageNet-gen": "/kaggle/input/tinyimagenet-gen/tiny_edm_1m.npz"
 }

@@ -373,8 +373,8 @@ class DataLoading():
             with open(file_path, 'r') as f:
                 self.path = json.load(f)
                 self.gen_path = self.path.get(f'{self.dataset}-gen')
-                self.corrupt-c_path = self.path.get(f'{self.dataset}-C')
-                self.corrupt-bar_path = self.path.get(f'{self.dataset}-C-bar')
+                self.corrupt_c_path = self.path.get(f'{self.dataset}-C')
+                self.corrupt_bar_path = self.path.get(f'{self.dataset}-C-bar')
             
             if not self.gen_path or not self.corrupt_path:
                 raise KeyError(
@@ -527,10 +527,10 @@ class DataLoading():
                     #np_data_c = np.concatenate(np.load(os.path.abspath(f'{self.corrupt_path}/{corruption}.npy')), np.load(os.path.abspath(f'{self.corrupt_path}-bar/{corruption}.npy')), axis=0)
                     corrupt_file_dir = os.path.abspath(f'{self.corrupt_path}/{corruption}.npy')
                     try:
-                        np_data_c = np.load(os.path.abspath(f'{self.corrupt_path}/{corruption}.npy'))
+                        np_data_c = np.load(os.path.abspath(f'{self.corrupt_c_path}/{corruption}.npy'))
                     except FileNotFoundError as e:
                         try:
-                            np_data_c = np.load(os.path.abspath(f'{self.corrupt-bar_path}/{corruption}.npy'))
+                            np_data_c = np.load(os.path.abspath(f'{self.corrupt_bar_path}/{corruption}.npy'))
                         except FileNotFoundError as e:
                             raise FileNotFoundError(f"File '{corruption}.npy' not found in {corrupt_file_dir}") from e
 
