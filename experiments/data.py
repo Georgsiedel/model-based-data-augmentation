@@ -434,7 +434,7 @@ class DataLoading():
                 self.validset = list(map(self.transforms_preprocess, self.validset))
             else:
                 if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                    self.validset = torchvision.datasets.ImageFolder(root='/kaggle/input/tinyimagenet/{self.dataset}/val',
+                    self.validset = torchvision.datasets.ImageFolder(root=f'/kaggle/input/tinyimagenet/{self.dataset}/val',
                                                                 transform=self.transforms_preprocess)
                 elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
                     load_helper = getattr(torchvision.datasets, self.dataset)
