@@ -415,7 +415,8 @@ class DataLoading():
             if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
                 if self.kaggle:
                     self.base_trainset = torchvision.datasets.ImageFolder(root=f'/kaggle/input/tinyimagenet/{self.dataset}/train') # Only for TinyImageNet. For use in Kaggle
-                self.base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train')) 
+                else:
+                    self.base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train')) 
             else:
                 load_helper = getattr(torchvision.datasets, self.dataset)
                 self.base_trainset = load_helper(root=os.path.abspath('../data'), train=True, download=True)
