@@ -414,7 +414,7 @@ class DataLoading():
         if self.test_only == False:
             if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
                 if self.kaggle:
-                    self.base_trainset = torchvision.datasets.ImageFolder(root=f'kaggle/input/tinyimagenet/{self.dataset}/train') # Only for TinyImageNet. For use in Kaggle
+                    self.base_trainset = torchvision.datasets.ImageFolder(root=f'/kaggle/input/tinyimagenet/{self.dataset}/train') # Only for TinyImageNet. For use in Kaggle
                 self.base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train')) 
             else:
                 load_helper = getattr(torchvision.datasets, self.dataset)
@@ -433,7 +433,7 @@ class DataLoading():
                 self.validset = list(map(self.transforms_preprocess, self.validset))
             else:
                 if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                    self.validset = torchvision.datasets.ImageFolder(root='kaggle/input/tinyimagenet/{self.dataset}/val',
+                    self.validset = torchvision.datasets.ImageFolder(root='/kaggle/input/tinyimagenet/{self.dataset}/val',
                                                                 transform=self.transforms_preprocess)
                 elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
                     load_helper = getattr(torchvision.datasets, self.dataset)
@@ -447,7 +447,7 @@ class DataLoading():
 
         #Testset
         if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-            self.testset = torchvision.datasets.ImageFolder(root=f'kaggle/input/tinyimagenet/{self.dataset}/val',
+            self.testset = torchvision.datasets.ImageFolder(root=f'/kaggle/input/tinyimagenet/{self.dataset}/val',
                                                         transform=self.transforms_preprocess)
         elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
             load_helper = getattr(torchvision.datasets, self.dataset)
