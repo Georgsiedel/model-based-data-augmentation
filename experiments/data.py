@@ -554,12 +554,11 @@ class DataLoading():
                 #intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity)),
                                                                     #   transform=self.transforms_preprocess) for intensity in range(1, 6)]
                 if self.kaggle:
-                    corrupt_file_dir = f'{self.corrupt_c_path}/{corruption}.npy'
                     try:
-                        intensity_datasets = [torchvision.datasets.ImageFolder(root=f'{self.corrupt_c_path}/{corruption}/{intensity}', transform=self.transforms_preprocess) for intensity in range(1, 6)]  
+                        intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.join(self.corrupt_c_path, corruption, str(intensity)), transform=self.transforms_preprocess) for intensity in range(1, 6)]  
                     except FileNotFoundError as e:
                         try:
-                            intensity_datasets = [torchvision.datasets.ImageFolder(root=f'{self.corrupt_bar_path}/{corruption}/{intensity}', transform=self.transforms_preprocess) for intensity in range(1, 6)]
+                            intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.join(self.corrupt_bar_path, corruption, str(intensity)), transform=self.transforms_preprocess) for intensity in range(1, 6)]
                         except FileNotFoundError as e:
                             raise FileNotFoundError(f"File '{corruption}.npy' not found in {corrupt_file_dir}") from e
                 else:
