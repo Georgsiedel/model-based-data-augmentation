@@ -522,14 +522,14 @@ class DataLoading():
                 subtestset = self.testset
                 if self.kaggle:
                     #np_data_c = np.concatenate(np.load(os.path.abspath(f'{self.corrupt_path}/{corruption}.npy')), np.load(os.path.abspath(f'{self.corrupt_path}-bar/{corruption}.npy')), axis=0)
-                    corrupt_file_dir = f'{self.corrupt_path}/{corruption}.npy'
+                    #corrupt_file_dir = f'{self.corrupt_path}/{corruption}.npy'
                     try:
                         np_data_c = np.load(f'{self.corrupt_c_path}/{corruption}.npy')
                     except FileNotFoundError as e:
                         try:
                             np_data_c = np.load(f'{self.corrupt_bar_path}/{corruption}.npy')
                         except FileNotFoundError as e:
-                            raise FileNotFoundError(f"File '{corruption}.npy' not found in {corrupt_file_dir}") from e
+                            raise FileNotFoundError(f"File '{corruption}.npy' not found in {self.corrupt_c_path} or {self.corrupt_bar_path}") from e
 
                 else:
                     np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'))
@@ -560,7 +560,7 @@ class DataLoading():
                         try:
                             intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.join(self.corrupt_bar_path, corruption, str(intensity)), transform=self.transforms_preprocess) for intensity in range(1, 6)]
                         except FileNotFoundError as e:
-                            raise FileNotFoundError(f"File '{corruption}.npy' not found in {corrupt_file_dir}") from e
+                            raise FileNotFoundError(f"File '{corruption}.npy' not found in {self.corrupt_c_path} or {self.corrupt_bar_path}") from e
                 else:
                     intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity)),
                                                                       transform=self.transforms_preprocess) for intensity in range(1, 6)]
