@@ -7,6 +7,6 @@
     "CIFAR100-gen": "/kaggle/input/cifar-100-1m-generated/1m.npz",
     "TinyImageNet": "/kaggle/input/tinyimagenet/TinyImageNet/",
     "TinyImageNet-C": "/kaggle/input/tinyimagenet-c/TinyImageNet-c",
-    "TinyImageNet-bar-C": "/kaggle/input/tinyimagenet-bar-c/TinyImageNet-c-bar",
+    "TinyImageNet-C-bar": "/kaggle/input/tinyimagenet-bar-c/TinyImageNet-c-bar",
     "TinyImageNet-gen": "/kaggle/input/tinyimagenet-gen/tiny_edm_1m.npz"
 }
