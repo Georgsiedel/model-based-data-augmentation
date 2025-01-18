@@ -164,6 +164,7 @@ class DatasetStyleTransforms:
         self.stylized_ratio = stylized_ratio
         self.batch_size = batch_size
         self.transform_style = transform_style
+        self.is_lazy_loaded = False
 
     def __call__(self, dataset):
         """
@@ -176,8 +177,9 @@ class DatasetStyleTransforms:
             updated_dataset: Updated dataset with stylized images.
             transformed_flags: Boolean list indicating which images were transformed.
         """
-        if callable(self.transform_style):
+        if not self.is_lazy_loaded and callable(self.transform_style):
             self.transform_style = self.transform_style()
+            self.is_lazy_loaded = True
 
         if isinstance(dataset, torch.utils.data.Subset):
             # Handle PyTorch Subset
