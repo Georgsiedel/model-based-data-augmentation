@@ -16,7 +16,7 @@ concurrent_combinations = 1 #only has an effect if combine_train_corruption is T
 batchsize = 256
 minibatchsize = 8
 dataset = 'CIFAR100' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
-generated_ratio = 0.0
+generated_ratio = 0.7
 normalize = True
 validontest = True
 validonc = True
@@ -34,9 +34,8 @@ number_workers = 2
 modeltype = 'WideResNet_28_4'
 modelparams = {'dropout_rate': 0.2, 'activation_function': 'silu'}
 resize = False
-aug_strat_check = True
-train_aug_strat_orig = 'TrivialAugmentWide' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
-train_aug_strat_gen = 'TrivialAugmentWide' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+train_aug_strat_orig = 'None' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+train_aug_strat_gen = 'StyleTransferalpha00' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 loss = 'CrossEntropyLoss'
 lossparams = {'label_smoothing': 0.1}
 trades_loss = False
@@ -47,7 +46,7 @@ mixup = {'alpha': 0.2, 'p': 0.0} #default alpha 0.2 #If both mixup and cutmix ar
 cutmix = {'alpha': 1.0, 'p': 0.0} # default alpha 1.0 #If both mixup and cutmix are >0, mixup or cutmix are selected by 0.5 chance
 manifold = {'apply': False, 'noise_factor': 3}
 RandomEraseProbability = 0.0
-swa = {'apply': False, 'start_factor': 0.9, 'lr_factor': 0.2}
+swa = {'apply': True, 'start_factor': 0.9, 'lr_factor': 0.2}
 
 #define train and test corruptions:
 #define noise type (first column): 'gaussian', 'uniform-l0-impulse', 'uniform-l0-salt-pepper', 'uniform-linf'. also: all positive numbers p>0 for uniform Lp possible: 'uniform-l1', 'uniform-l2', ...

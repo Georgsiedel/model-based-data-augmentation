@@ -31,8 +31,8 @@ earlystopPatience = 15
 optimizer = 'SGD'
 optimizerparams = {'momentum': 0.9, 'weight_decay': 1e-4, 'nesterov': True}
 number_workers = 2
-modeltype = 'WideResNet_28_4'
-modelparams = {'dropout_rate': 0.2, 'activation_function': 'silu'}
+modeltype = 'DenseNet201_12'
+modelparams = {}
 resize = False
 aug_strat_check = True
 train_aug_strat_orig = 'TrivialAugmentWide' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
@@ -47,7 +47,7 @@ mixup = {'alpha': 0.2, 'p': 0.0} #default alpha 0.2 #If both mixup and cutmix ar
 cutmix = {'alpha': 1.0, 'p': 0.0} # default alpha 1.0 #If both mixup and cutmix are >0, mixup or cutmix are selected by 0.5 chance
 manifold = {'apply': False, 'noise_factor': 3}
 RandomEraseProbability = 0.0
-swa = {'apply': True, 'start_factor': 0.9, 'lr_factor': 0.1}
+swa = {'apply': False, 'start_factor': 0.9, 'lr_factor': 0.2}
 
 #define train and test corruptions:
 #define noise type (first column): 'gaussian', 'uniform-l0-impulse', 'uniform-l0-salt-pepper', 'uniform-linf'. also: all positive numbers p>0 for uniform Lp possible: 'uniform-l1', 'uniform-l2', ...
