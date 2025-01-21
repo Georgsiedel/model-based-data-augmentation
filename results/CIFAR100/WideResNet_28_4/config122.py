@@ -15,7 +15,7 @@ concurrent_combinations = 1 #only has an effect if combine_train_corruption is T
 
 batchsize = 256
 minibatchsize = 8
-dataset = 'TinyImageNet' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
+dataset = 'CIFAR100' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
 generated_ratio = 0.0
 normalize = True
 validontest = True
@@ -35,7 +35,7 @@ modeltype = 'WideResNet_28_4'
 modelparams = {'dropout_rate': 0.2, 'activation_function': 'silu'}
 resize = False
 aug_strat_check = True
-train_aug_strat_orig = 'StyleTransfer50alpha01-10' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+train_aug_strat_orig = 'StyleTransferalpha10' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 train_aug_strat_gen = 'TrivialAugmentWide' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 loss = 'CrossEntropyLoss'
 lossparams = {'label_smoothing': 0.1}
