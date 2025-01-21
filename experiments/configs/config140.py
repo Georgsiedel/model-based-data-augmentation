@@ -15,7 +15,7 @@ concurrent_combinations = 1 #only has an effect if combine_train_corruption is T
 
 batchsize = 256
 minibatchsize = 8
-dataset = 'CIFAR100' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
+dataset = 'TinyImageNet' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
 generated_ratio = 0.7
 normalize = True
 validontest = True
