@@ -6,6 +6,7 @@ import shutil
 import argparse
 import ast
 import os
+import datetime
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -249,16 +250,18 @@ class TrainTracking:
         self.swa = swa
         self.train_accs, self.train_losses, self.valid_accs, self.valid_losses, self.valid_accs_robust = [],[],[],[],[]
         self.valid_accs_adv, self.valid_accs_swa, self.valid_accs_robust_swa, self.valid_accs_adv_swa = [],[],[],[]
+        self.elapsed_time = []
 
     def load_learning_curves(self):
 
         learning_curve_frame = pd.read_csv(os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_'
                                            f'learning_curve_run_{self.run}.csv'), sep=';', decimal=',')
-        train_accs = learning_curve_frame.iloc[:, 0].values.tolist()
-        train_losses = learning_curve_frame.iloc[:, 1].values.tolist()
-        valid_accs = learning_curve_frame.iloc[:, 2].values.tolist()
-        valid_losses = learning_curve_frame.iloc[:, 3].values.tolist()
-        columns=4
+        elapsed_time = learning_curve_frame.iloc[:, 0].values.tolist()
+        train_accs = learning_curve_frame.iloc[:, 1].values.tolist()
+        train_losses = learning_curve_frame.iloc[:, 2].values.tolist()
+        valid_accs = learning_curve_frame.iloc[:, 3].values.tolist()
+        valid_losses = learning_curve_frame.iloc[:, 4].values.tolist()
+        columns=5
 
         valid_accs_robust, valid_accs_adv, valid_accs_swa, valid_accs_robust_swa, valid_accs_adv_swa = [],[],[],[],[]
         if self.validonc == True:
@@ -275,6 +278,7 @@ class TrainTracking:
             if self.validonadv == True:
                 valid_accs_adv_swa = learning_curve_frame.iloc[:, columns+1].values.tolist()
 
+        self.elapsed_time = elapsed_time
         self.train_accs = train_accs
         self.train_losses = train_losses
         self.valid_accs = valid_accs
@@ -285,9 +289,10 @@ class TrainTracking:
         self.valid_accs_robust_swa = valid_accs_robust_swa
         self.valid_accs_adv_swa = valid_accs_adv_swa
 
-    def save_metrics(self, train_acc, valid_acc, valid_acc_robust, valid_acc_adv, valid_acc_swa,
+    def save_metrics(self, elapsed_time, train_acc, valid_acc, valid_acc_robust, valid_acc_adv, valid_acc_swa,
                              valid_acc_robust_swa, valid_acc_adv_swa, train_loss, valid_loss):
 
+        self.elapsed_time.append(elapsed_time)
         self.train_accs.append(train_acc)
         self.train_losses.append(train_loss)
         self.valid_accs.append(valid_acc)
@@ -300,9 +305,9 @@ class TrainTracking:
 
     def save_learning_curves(self):
 
-        learning_curve_frame = pd.DataFrame({"train_accuracy": self.train_accs, "train_loss": self.train_losses,
+        learning_curve_frame = pd.DataFrame({'time': self.elapsed_time, "train_accuracy": self.train_accs, "train_loss": self.train_losses,
                                                  "valid_accuracy": self.valid_accs, "valid_loss": self.valid_losses})
-        columns = 4
+        columns = 5
         if self.validonc == True:
             learning_curve_frame.insert(columns, "valid_accuracy_robust", self.valid_accs_robust)
             columns = columns + 1
@@ -353,6 +358,7 @@ class TrainTracking:
                         os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}.py'))
 
     def print_results(self):
+        print('Total training time: ', str(datetime.timedelta(seconds=max(self.elapsed_time))))
         print("Maximum (non-SWA) validation accuracy of", max(self.valid_accs), "achieved after",
               np.argmax(self.valid_accs) + 1, "epochs; ")
         if self.validonc:

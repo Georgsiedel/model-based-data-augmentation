@@ -17,6 +17,7 @@ from torch.optim.swa_utils import AveragedModel, SWALR
 import torchvision.models as torchmodels
 import torchvision.transforms.v2 as transforms
 from experiments.utils import plot_images
+import time
 
 import data
 import utils
@@ -269,17 +270,24 @@ if __name__ == '__main__':
                                                                     optimizer, scheduler, swa_scheduler, 'standard')
         Traintracker.load_learning_curves()
         print('\nResuming from checkpoint after epoch', start_epoch)
-    # load augmented trainset and Dataloader
-    Dataloader.load_augmented_traindata(target_size=len(Dataloader.base_trainset),
-                                        epoch=start_epoch,
-                                        robust_samples=criterion.robust_samples)
-    trainloader, validationloader = Dataloader.get_loader(args.batchsize, args.number_workers)
-  
+    
     # Calculate steps and epochs
     total_steps, start_steps = utils.calculate_steps(args.dataset, args.batchsize, args.epochs, start_epoch, args.warmupepochs,
                                         args.validontest, args.validonc, args.swa['apply'], args.swa['start_factor'])
-    # Training loop
+    
     with tqdm(total=total_steps, initial=start_steps) as pbar:
+        
+        training_start_time = time.time()
+        if args.resume == True:
+            training_start_time = training_start_time - max(Traintracker.elapsed_time)
+    
+        # load augmented trainset and Dataloader
+        Dataloader.load_augmented_traindata(target_size=len(Dataloader.base_trainset),
+                                            epoch=start_epoch,
+                                            robust_samples=criterion.robust_samples)
+        trainloader, validationloader = Dataloader.get_loader(args.batchsize, args.number_workers)
+    
+        # Training loop
         with torch.autograd.set_detect_anomaly(False, check_nan=False): #this may resolve some Cuda/cuDNN errors.
             # check_nan=True increases 32bit precision train time by ~20% and causes errors due to nan values for mixed precision training.
             for epoch in range(start_epoch, end_epoch):
@@ -302,9 +310,10 @@ if __name__ == '__main__':
                     valid_acc_swa, valid_acc_robust_swa, valid_acc_adv_swa = valid_acc, valid_acc_robust, valid_acc_adv
 
                 # Check for best model, save model(s) and learning curve and check for earlystopping conditions
+                elapsed_time = time.time() - training_start_time
                 Checkpointer.earlystopping(valid_acc)
                 Checkpointer.save_checkpoint(model, swa_model, optimizer, scheduler, swa_scheduler, epoch)
-                Traintracker.save_metrics(train_acc, valid_acc, valid_acc_robust, valid_acc_adv, valid_acc_swa,
+                Traintracker.save_metrics(elapsed_time, train_acc, valid_acc, valid_acc_robust, valid_acc_adv, valid_acc_swa,
                              valid_acc_robust_swa, valid_acc_adv_swa, train_loss, valid_loss)
                 Traintracker.save_learning_curves()
                 if Checkpointer.early_stop:
