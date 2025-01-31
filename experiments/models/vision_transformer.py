@@ -17,7 +17,10 @@ from torchvision.transforms._presets import ImageClassification, InterpolationMo
 
 __all__ = [
     "VisionTransformer",
-    "ViT_B_8"
+    "ViT_B_4",
+    "ViT_B_8",
+    "ViT_B_16",
+    "ViT_B_16_Weights"
 ]
 
 class ConvStemConfig(NamedTuple):
@@ -164,7 +167,6 @@ class VisionTransformer(ct_model.CtModel):
         dropout: float = 0.0,
         attention_dropout: float = 0.0,
         num_classes: int = 1000,
-        
         representation_size: Optional[int] = None,
         norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
         conv_stem_configs: Optional[List[ConvStemConfig]] = None,
@@ -325,11 +327,13 @@ def _vision_transformer(
     weights: Optional[WeightsEnum],
     **kwargs: Any,
 ) -> VisionTransformer:
+    
     if weights is not None:
-        _ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
+        weights_num_classes = len(weights.meta["categories"])
+        # _ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
         assert weights.meta["min_size"][0] == weights.meta["min_size"][1]
         _ovewrite_named_param(kwargs, "image_size", weights.meta["min_size"][0])
-    image_size = kwargs.pop("image_size")
+    image_size = kwargs.pop("image_size", 224)
 
     model = VisionTransformer(
         image_size=image_size,
@@ -340,9 +344,43 @@ def _vision_transformer(
         mlp_dim=mlp_dim,
         dataset=dataset,
         normalized=normalized,
-        num_classes=num_classes,
+        num_classes=weights_num_classes,
         **kwargs,
     )
+    
+    # if we load weights, but need a different number of classes to transfer, e.g. TinyImageNet
+    if weights_num_classes != num_classes:
+        if "pre_logits" in model.heads:
+            # Modify the head while preserving other layers
+            updated_heads = OrderedDict([
+                ("pre_logits", model.heads.pre_logits),  # Keep existing pre_logits
+                ("act", model.heads.act),               # Keep activation
+                ("head", nn.Linear(model.heads.pre_logits.out_features, num_classes)),
+            ])
+        else:
+            # Directly modify the single head layer
+            updated_heads = OrderedDict([
+                ("head", nn.Linear(model.heads.head.in_features, num_classes)),
+            ])
+
+        # Replace the model's `heads` with the updated Sequential
+        model.heads = nn.Sequential(updated_heads)
+        
+    if weights:     
+        # Load pretrained state dict and remove mismatched keys
+        state_dict = weights.get_state_dict(progress=progress, check_hash=True)
+
+        if "heads.head.weight" in state_dict:
+            del state_dict["heads.head.weight"]
+        if "heads.head.bias" in state_dict:
+            del state_dict["heads.head.bias"]
+
+        # Load the modified state dict with strict=False
+        model.load_state_dict(state_dict, strict=False)
+
+        # Initialize the new head
+        nn.init.xavier_uniform_(model.heads.head.weight)
+        nn.init.zeros_(model.heads.head.bias)
 
     return model
 
@@ -435,7 +473,6 @@ class ViT_B_16_Weights(WeightsEnum):
         },
     )
     DEFAULT = IMAGENET1K_V1
-
 
 @handle_legacy_interface(weights=("pretrained", ViT_B_16_Weights.IMAGENET1K_V1))
 def ViT_B_16(*, weights: Optional[ViT_B_16_Weights] = None, dataset: str, normalized: bool, factor: int, num_classes: int, progress: bool = True, **kwargs: Any) -> VisionTransformer:

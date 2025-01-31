@@ -331,7 +331,7 @@ class AugmentedDataset(torch.utils.data.Dataset):
             aug = self.transforms_orig_after_style if is_stylized else self.transforms_orig_after_nostyle
 
         augment = transforms.Compose([self.preprocess, self.transforms_basic, aug])
-        
+
         if self.robust_samples == 0:
             return augment(x), y
     
@@ -371,17 +371,18 @@ class DataLoading():
         t = transforms.ToTensor()
         c32 = transforms.RandomCrop(32, padding=4)
         c64 = transforms.RandomCrop(64, padding=8)
+        c224 = transforms.RandomCrop(224, padding=28)
         flip = transforms.RandomHorizontalFlip()
         r224 = transforms.Resize(224, antialias=True)
         r256 = transforms.Resize(256, antialias=True)
-        c224 = transforms.CenterCrop(224)
+        cc224 = transforms.CenterCrop(224)
         rrc224 = transforms.RandomResizedCrop(224, antialias=True)
         re = transforms.RandomErasing(p=RandomEraseProbability, scale=(0.02, 0.4)) #, value='random' --> normally distributed and out of bounds 0-1
 
         # transformations of validation/test set and necessary transformations for training
         # always done (even for clean images while training, when using robust loss)
         if self.dataset == 'ImageNet':
-            self.transforms_preprocess = transforms.Compose([t, r256, c224])
+            self.transforms_preprocess = transforms.Compose([t, r256, cc224])
         elif self.resize == True:
             self.transforms_preprocess = transforms.Compose([t, r224])
         else:
@@ -391,7 +392,10 @@ class DataLoading():
         if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
             self.transforms_basic = transforms.Compose([flip, c32])
         elif self.dataset == 'TinyImageNet':
-            self.transforms_basic = transforms.Compose([flip, c64])
+            if self.resize:
+                self.transforms_basic = transforms.Compose([flip, c224])
+            else:
+                self.transforms_basic = transforms.Compose([flip, c64])
         else:
             self.transforms_basic = transforms.Compose([flip])
         self.stylization_orig, self.transforms_orig_after_style, self.transforms_orig_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_orig, re, self.dataset, self.factor)
@@ -549,7 +553,7 @@ class DataLoading():
         else:
             self.CustomSampler = BatchSampler(RandomSampler(self.trainset), batch_size=batchsize, drop_last=False)
 
-        self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
+        self.trainloader = DataLoader(self.trainset, pin_memory=False, batch_sampler=self.CustomSampler,
                                       num_workers=number_workers, worker_init_fn=seed_worker, 
                                         generator=g, persistent_workers=True)
 
@@ -564,7 +568,7 @@ class DataLoading():
 
         g = torch.Generator()
         g.manual_seed(self.epoch + self.epochs * self.run)
-        self.trainloader = DataLoader(self.trainset, batch_sampler=self.CustomSampler, pin_memory=True, 
+        self.trainloader = DataLoader(self.trainset, batch_sampler=self.CustomSampler, pin_memory=False, 
                                       num_workers=self.number_workers, worker_init_fn=seed_worker,
                                       generator=g, persistent_workers=True)
         return self.trainloader

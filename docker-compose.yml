@@ -5,6 +5,7 @@ services:
     build:
       context: . # Path to the Dockerfile (current directory)
       dockerfile: Dockerfile
+    shm_size: '4g'
     runtime: nvidia
     environment:
       NVIDIA_VISIBLE_DEVICES: "0"  # Restrict to GPU 0
