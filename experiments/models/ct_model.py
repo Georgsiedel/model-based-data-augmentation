@@ -23,6 +23,27 @@ class CtModel(nn.Module):
         if self.normalized:
             x = (x - self.mu) / self.sigma
         return x
+    
+    def noise_mixup(self, out, targets, robust_samples, corruptions, mixup_alpha, mixup_p, cutmix_alpha, cutmix_p, noise_minibatchsize,
+                            concurrent_combinations, noise_sparsity, noise_patch_lower_scale, noise_patch_upper_scale,
+                            generated_ratio):
+
+        #define where mixup is applied. k=0 is in the input space, k>0 is in the embedding space (manifold mixup)
+        if self.training == False: k = -1
+        else: k = 0
+
+        if k == 0:  # Do input mixup if k is 0
+            mixed_out, targets = mixup_process(out, targets, robust_samples, self.num_classes, mixup_alpha, mixup_p,
+                                         cutmix_alpha, cutmix_p, generated_ratio, manifold=False, inplace=True)
+            noisy_out = apply_noise(mixed_out, noise_minibatchsize, corruptions, concurrent_combinations,
+                                                            self.normalized, self.dataset,
+                                                            manifold=False, manifold_factor=1, noise_sparsity=noise_sparsity,
+                                                            noise_patch_lower_scale=noise_patch_lower_scale,
+                                                            noise_patch_upper_scale=noise_patch_upper_scale)
+            out = noisy_out
+            #plot_images(4, self.mean, self.std, noisy_out, noisy_out)
+
+        return out, targets
 
     def forward_noise_mixup(self, out, targets, robust_samples, corruptions, mixup_alpha, mixup_p, manifold,
                             manifold_noise_factor, cutmix_alpha, cutmix_p, noise_minibatchsize,

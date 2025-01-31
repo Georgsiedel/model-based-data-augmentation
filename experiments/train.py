@@ -15,7 +15,6 @@ import torch.amp
 import torch.optim as optim
 from torch.optim.swa_utils import AveragedModel, SWALR
 import torchvision.models as torchmodels
-import torchvision.transforms.v2 as transforms
 from experiments.utils import plot_images
 import time
 
@@ -86,8 +85,6 @@ parser.add_argument('--cutmix', default={'alpha': 1.0, 'p': 0.0}, type=str, acti
                     'chosen without overlapping based on their probability, even if the sum of the probabilities is >1')
 parser.add_argument('--manifold', default={'apply': False, 'noise_factor': 4}, type=str, action=utils.str2dictAction, metavar='KEY=VALUE',
                     help='Choose whether to apply noisy mixup in manifold layers')
-parser.add_argument('--combine_train_corruptions', type=utils.str2bool, nargs='?', const=True, default=True,
-                    help='Whether to combine all training noise values by drawing from the randomly')
 parser.add_argument('--concurrent_combinations', default=1, type=int, help='How many of the training noise values should '
                     'be applied at once on one image. USe only if you defined multiple training noise values.')
 parser.add_argument('--number_workers', default=2, type=int, help='How many workers are launched to parallelize data '
@@ -121,17 +118,13 @@ parser.add_argument('--generated_ratio', default=0.0, type=float, help='ratio of
 args = parser.parse_args()
 configname = (f'experiments.configs.config{args.experiment}')
 config = importlib.import_module(configname)
-if args.combine_train_corruptions == True:
-    train_corruptions = config.train_corruptions
-else:
-    train_corruptions = args.train_corruptions
+train_corruptions = config.train_corruptions
 
 def train_epoch(pbar):
 
     model.train()
     correct, total, train_loss, avg_train_loss = 0, 0, 0, 0
     for batch_idx, (inputs, targets) in enumerate(trainloader):
-
         optimizer.zero_grad()
         if criterion.robust_samples >= 1:
             inputs = torch.cat(inputs, 0)
@@ -256,9 +249,9 @@ if __name__ == '__main__':
     else:
         swa_model, swa_scheduler = None, None
     Scaler = torch.amp.GradScaler(device=device)
-    Checkpointer = utils.Checkpoint(args.combine_train_corruptions, args.dataset, args.modeltype, args.experiment,
+    Checkpointer = utils.Checkpoint(args.dataset, args.modeltype, args.experiment,
                                     train_corruptions, args.run, earlystopping=args.earlystop, patience=args.earlystopPatience,
-                                    verbose=False,  checkpoint_path=f'../trained_models/checkpoint_{args.experiment}.pt')
+                                    verbose=False,  checkpoint_path=f'../trained_models/checkpoint_{args.experiment}_{args.run}.pt')
     Traintracker = utils.TrainTracking(args.dataset, args.modeltype, args.lrschedule, args.experiment, args.run,
                             args.validonc, args.validonadv, args.swa)
 

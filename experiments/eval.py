@@ -38,8 +38,6 @@ parser.add_argument('--resize', type=utils.str2bool, nargs='?', const=False, def
                     help='Resize a model to 224x224 pixels, standard for models like transformers.')
 parser.add_argument('--combine_test_corruptions', type=utils.str2bool, nargs='?', const=False, default=False,
                     help='Whether to combine all testing noise values by drawing from the randomly')
-parser.add_argument('--combine_train_corruptions', type=utils.str2bool, nargs='?', const=True, default=True,
-                    help='Whether to combine all training noise values by drawing from the randomly')
 parser.add_argument('--number_workers', default=0, type=int, help='How many workers are launched to parallelize data '
                     'loading. Experimental. 4 for ImageNet, 1 for Cifar. More demand GPU memory, but maximize GPU usage.')
 parser.add_argument('--normalize', type=utils.str2bool, nargs='?', const=False, default=False,
@@ -62,7 +60,6 @@ args = parser.parse_args()
 configname = (f'experiments.configs.config{args.experiment}')
 config = importlib.import_module(configname)
 test_corruptions = config.test_corruptions
-train_corruptions = config.train_corruptions
 
 def compute_clean(testloader, model, num_classes):
     with torch.no_grad():
@@ -93,8 +90,8 @@ def compute_clean(testloader, model, num_classes):
 
 if __name__ == '__main__':
     Testtracker = utils.TestTracking(args.dataset, args.modeltype, args.experiment, args.runs,
-                                args.combine_train_corruptions, args.combine_test_corruptions, args.test_on_c,
-                                args.calculate_adv_distance, args.calculate_autoattack_robustness, train_corruptions,
+                                args.combine_test_corruptions, args.test_on_c,
+                                args.calculate_adv_distance, args.calculate_autoattack_robustness,
                                 test_corruptions, args.adv_distance_params)
 
     # Load data
@@ -105,61 +102,60 @@ if __name__ == '__main__':
                             num_workers=args.number_workers)
 
     for run in range(args.runs):
-        for model in range(Testtracker.model_count):
+            
+        Testtracker.initialize(run)
 
-            Testtracker.initialize(run, model)
+        # Load model
+        if args.dataset in ('CIFAR10', 'CIFAR100', 'TinyImageNet'):
+            model_class = getattr(low_dim_models, args.modeltype)
+            model = model_class(dataset=args.dataset, normalized=args.normalize, num_classes=Dataloader.num_classes,
+                                factor=args.pixel_factor, **args.modelparams)
+        else:
+            model_class = getattr(torchmodels, args.modeltype)
+            model = model_class(num_classes=Dataloader.num_classes, **args.modelparams)
+        model = model.to(device) #torch.nn.DataParallel(
+        cudnn.benchmark = True
+        #model.load_state_dict(torch.load(Testtracker.filename)['model_state_dict'], strict=True)
 
-            # Load model
-            if args.dataset in ('CIFAR10', 'CIFAR100', 'TinyImageNet'):
-                model_class = getattr(low_dim_models, args.modeltype)
-                model = model_class(dataset=args.dataset, normalized=args.normalize, num_classes=Dataloader.num_classes,
-                                    factor=args.pixel_factor, **args.modelparams)
-            else:
-                model_class = getattr(torchmodels, args.modeltype)
-                model = model_class(num_classes=Dataloader.num_classes, **args.modelparams)
-            model = model.to(device) #torch.nn.DataParallel(
-            cudnn.benchmark = True
-            #model.load_state_dict(torch.load(Testtracker.filename)['model_state_dict'], strict=True)
+        state_dict = torch.load(Testtracker.filename, weights_only=True)['model_state_dict']
 
-            state_dict = torch.load(Testtracker.filename, weights_only=True)['model_state_dict']
+        # Remove "module." prefix from keys
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            new_key = k.replace("module.", "")  # Remove "module." prefix
+            new_state_dict[new_key] = v
 
-            # Remove "module." prefix from keys
-            from collections import OrderedDict
-            new_state_dict = OrderedDict()
-            for k, v in state_dict.items():
-                new_key = k.replace("module.", "")  # Remove "module." prefix
-                new_state_dict[new_key] = v
+        # Load the modified state_dict into the original model
+        model.load_state_dict(new_state_dict, strict=False)
 
-            # Load the modified state_dict into the original model
-            model.load_state_dict(new_state_dict, strict=False)
+        model.eval()
 
-            model.eval()
+        # Clean Test Accuracy
+        acc, rmsce = compute_clean(testloader, model, Dataloader.num_classes)
+        Testtracker.track_results([acc, rmsce])
 
-            # Clean Test Accuracy
-            acc, rmsce = compute_clean(testloader, model, Dataloader.num_classes)
-            Testtracker.track_results([acc, rmsce])
+        if args.test_on_c == True:  # C-dataset robust accuracy
+            testsets_c = Dataloader.load_data_c(subset=False, subsetsize=None)
+            accs_c = eval_corruptions.compute_c_corruptions(args.dataset, testsets_c, model, args.batchsize,
+                                                            Dataloader.num_classes, eval_run=False)
+            Testtracker.track_results(accs_c)
 
-            if args.test_on_c == True:  # C-dataset robust accuracy
-                testsets_c = Dataloader.load_data_c(subset=False, subsetsize=None)
-                accs_c = eval_corruptions.compute_c_corruptions(args.dataset, testsets_c, model, args.batchsize,
-                                                                Dataloader.num_classes, eval_run=False)
-                Testtracker.track_results(accs_c)
+        if args.calculate_adv_distance == True:  # adversarial distance calculation
+            adv_acc, dist_sorted, mean_dist = eval_adversarial.compute_adv_distance(Dataloader.testset,
+                                                            args.number_workers, model, args.adv_distance_params)
+            Testtracker.track_results(np.concatenate(([adv_acc], mean_dist)))
+            Testtracker.save_adv_distance(dist_sorted, args.adv_distance_params)
 
-            if args.calculate_adv_distance == True:  # adversarial distance calculation
-                adv_acc, dist_sorted, mean_dist = eval_adversarial.compute_adv_distance(Dataloader.testset,
-                                                                args.number_workers, model, args.adv_distance_params)
-                Testtracker.track_results(np.concatenate(([adv_acc], mean_dist)))
-                Testtracker.save_adv_distance(dist_sorted, args.adv_distance_params)
+        if args.calculate_autoattack_robustness == True:  # adversarial accuracy calculation
+            adv_acc_aa, mean_dist_aa = eval_adversarial.compute_adv_acc(args.autoattack_params, Dataloader.testset,
+                                                                        model, args.number_workers, args.batchsize)
+            Testtracker.track_results([adv_acc_aa, mean_dist_aa])
 
-            if args.calculate_autoattack_robustness == True:  # adversarial accuracy calculation
-                adv_acc_aa, mean_dist_aa = eval_adversarial.compute_adv_acc(args.autoattack_params, Dataloader.testset,
-                                                                            model, args.number_workers, args.batchsize)
-                Testtracker.track_results([adv_acc_aa, mean_dist_aa])
+        # Robust Accuracy on p-norm noise - either combined or separate noise types
+        accs = eval_corruptions.select_p_corruptions(testloader, model, test_corruptions, args.dataset, args.combine_test_corruptions)
+        Testtracker.track_results(accs)
 
-            # Robust Accuracy on p-norm noise - either combined or separate noise types
-            accs = eval_corruptions.select_p_corruptions(testloader, model, test_corruptions, args.dataset, args.combine_test_corruptions)
-            Testtracker.track_results(accs)
-
-            print(Testtracker.accs)
+        print(Testtracker.accs)
 
     Testtracker.create_report()

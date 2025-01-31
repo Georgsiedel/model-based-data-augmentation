@@ -129,7 +129,7 @@ class Checkpoint:
     """Early stops the training if validation loss doesn't improve after a given patience.
     credit to https://github.com/Bjarten/early-stopping-pytorch/tree/master for early stopping functionality"""
 
-    def __init__(self, combine_train_corruptions, dataset, modeltype, experiment, train_corruption, run,
+    def __init__(self, dataset, modeltype, experiment, train_corruption, run,
                  earlystopping=False, patience=7, verbose=False, delta=0, trace_func=print,
                  checkpoint_path=f'../trained_models/checkpoint.pt',
                  ):
@@ -155,12 +155,7 @@ class Checkpoint:
         self.trace_func = trace_func
         self.early_stopping = earlystopping
         self.checkpoint_path = os.path.abspath(checkpoint_path)
-        if combine_train_corruptions:
-            self.final_model_path = os.path.abspath(f'../trained_models/{dataset}/{modeltype}/config{experiment}_run_{run}.pth')
-        else:
-            self.final_model_path = os.path.abspath(f'../trained_models/{dataset}/{modeltype}/config{experiment}_' \
-                    f'{train_corruption["noise_type"]}_eps_{train_corruption["epsilon"]}_{train_corruption["sphere"]}_run_{run}.pth')
-
+        self.final_model_path = os.path.abspath(f'../trained_models/{dataset}/{modeltype}/config{experiment}_run_{run}.pth')
 
     def earlystopping(self, val_acc):
 
@@ -369,27 +364,24 @@ class TrainTracking:
                   np.argmax(self.valid_accs_adv) + 1, "epochs; ")
 
 class TestTracking:
-    def __init__(self, dataset, modeltype, experiment, runs, combine_train_corruptions, combine_test_corruptions,
-                      test_on_c, calculate_adv_distance, calculate_autoattack_robustness, train_corruptions,
+    def __init__(self, dataset, modeltype, experiment, runs, combine_test_corruptions,
+                      test_on_c, calculate_adv_distance, calculate_autoattack_robustness,
                  test_corruptions, adv_distance_params):
         self.dataset = dataset
         self.modeltype = modeltype
         self.experiment = experiment
         self.runs = runs
-        self.combine_train_corruptions = combine_train_corruptions
         self.combine_test_corruptions = combine_test_corruptions
         self.test_on_c = test_on_c
         self.calculate_adv_distance = calculate_adv_distance
         self.calculate_autoattack_robustness = calculate_autoattack_robustness
-        self.train_corruptions = train_corruptions
         self.test_corruptions = test_corruptions
         self.adv_distance_params = adv_distance_params
         self.results_folder = f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}'
 
-        if combine_train_corruptions:
-            self.model_count = 1
-        else:
-            self.model_count = train_corruptions.shape[0]
+        self.eval_count = 1
+        if self.runs > 1:
+            self.eval_count = self.runs + 2
 
         self.test_count = 2
         if test_on_c:
@@ -404,93 +396,73 @@ class TestTracking:
         if calculate_autoattack_robustness:
             self.test_count += 2
 
-        self.all_test_metrics = np.empty([self.test_count, self.model_count, self.runs])
+        self.all_test_metrics = np.empty([self.test_count, self.runs])
 
     def create_report(self):
 
-        self.avg_test_metrics = np.empty([self.test_count, self.model_count])
-        self.std_test_metrics = np.empty([self.test_count, self.model_count])
-        self.max_test_metrics = np.empty([self.test_count, self.model_count])
+        self.test_metrics = np.empty([self.test_count, self.eval_count])
 
-        for idm in range(self.model_count):
-            for ide in range(self.test_count):
-                self.avg_test_metrics[ide, idm] = self.all_test_metrics[ide, idm, :].mean()
-                self.std_test_metrics[ide, idm] = self.all_test_metrics[ide, idm, :].std()
-                self.max_test_metrics[ide, idm] = self.all_test_metrics[ide, idm, :].max()
+        for ide in range(self.test_count):
+            self.test_metrics[ide, 0] = self.all_test_metrics[ide, :].mean()
+            if self.eval_count > 1:
+                self.test_metrics[ide, 1] = self.all_test_metrics[ide, :].std()
+                for idr in range(self.runs):
+                    self.test_metrics[ide, idr + 2] = self.all_test_metrics[ide, idr]
 
-        if self.combine_train_corruptions == True:
-            train_corruptions_string = ['config_model']
-        else:
-            train_corruptions_string = np.array([','.join(map(str, row.values())) for row in self.train_corruptions])
+        column_string = np.array([f'config_{self.experiment}_avg'])
+        if self.eval_count > 1:
+            column_string = np.append(column_string, [f'config_{self.experiment}_std'], axis=0)
+            for idr in range(self.runs):
+                column_string = np.append(column_string, [f'config_{self.experiment}_run_{idr}'], axis=0)
 
-        test_corruptions_string = np.array(['Standard_Acc', 'RMSCE'])
+        test_metrics_string = np.array(['Standard_Acc', 'RMSCE'])
         if self.test_on_c == True:
             test_corruptions_label = np.loadtxt(os.path.abspath('../data/c-labels.txt'), dtype=list)
             if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
                 test_corruptions_bar_label = np.loadtxt(os.path.abspath('../data/c-bar-labels-cifar.txt'), dtype=list)
             elif self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
                 test_corruptions_bar_label = np.loadtxt(os.path.abspath('../data/c-bar-labels-IN.txt'), dtype=list)
-            test_corruptions_string = np.append(test_corruptions_string, test_corruptions_label, axis=0)
-            test_corruptions_string = np.append(test_corruptions_string, test_corruptions_bar_label, axis=0)
-            test_corruptions_string = np.append(test_corruptions_string,
+            test_metrics_string = np.append(test_metrics_string, test_corruptions_label, axis=0)
+            test_metrics_string = np.append(test_metrics_string, test_corruptions_bar_label, axis=0)
+            test_metrics_string = np.append(test_metrics_string,
                                                 ['Acc_C-all-19', 'Acc_C-original-15', 'Acc_C-bar-10', 'Acc_all-ex-pixelwise-noise-24', 'RMSCE_C'],
                                                 axis=0)
 
         if self.calculate_adv_distance == True:
-            test_corruptions_string = np.append(test_corruptions_string, ['Acc_from_adv_dist_calculation'])
+            test_metrics_string = np.append(test_metrics_string, ['Acc_from_adv_dist_calculation'])
             for _, n in enumerate(self.adv_distance_params["norm"]):
-                test_corruptions_string = np.append(test_corruptions_string,
+                test_metrics_string = np.append(test_metrics_string,
                                                     [f'{n}-norm-Mean_adv_dist_with_misclassifications_0',
                                                     f'{n}-norm-Mean_adv_dist_without_misclassifications'], axis=0)
                 for _, b in enumerate(self.adv_distance_params["clever_samples"]):
-                    test_corruptions_string = np.append(test_corruptions_string,
+                    test_metrics_string = np.append(test_metrics_string,
                                                         [f'{n}-norm-Mean_CLEVER-{b}-samples'], axis=0)
         if self.calculate_autoattack_robustness == True:
-            test_corruptions_string = np.append(test_corruptions_string,
+            test_metrics_string = np.append(test_metrics_string,
                                                 ['Adversarial_accuracy_autoattack', 'Mean_adv_distance_autoattack)'],
                                                 axis=0)
         if self.combine_test_corruptions == True:
-            test_corruptions_string = np.append(test_corruptions_string, ['Combined_Noise'])
+            test_metrics_string = np.append(test_metrics_string, ['Combined_Noise'])
         else:
             test_corruptions_labels = np.array([','.join(map(str, row.values())) for row in self.test_corruptions])
-            test_corruptions_string = np.append(test_corruptions_string, test_corruptions_labels)
+            test_metrics_string = np.append(test_metrics_string, test_corruptions_labels)
 
-        avg_report_frame = pd.DataFrame(self.avg_test_metrics, index=test_corruptions_string,
-                                        columns=train_corruptions_string)
-        avg_report_frame.to_csv(os.path.abspath(f'{self.results_folder}_metrics_test_avg.csv'), index=True, header=True,
+        report_frame = pd.DataFrame(self.test_metrics, index=test_metrics_string,
+                                        columns=column_string)
+        report_frame.to_csv(os.path.abspath(f'{self.results_folder}_result_metrics.csv'), index=True, header=True,
                                 sep=';', float_format='%1.4f', decimal=',')
-        if self.runs >= 2:
-            max_report_frame = pd.DataFrame(self.max_test_metrics, index=test_corruptions_string,
-                                            columns=train_corruptions_string)
-            std_report_frame = pd.DataFrame(self.std_test_metrics, index=test_corruptions_string,
-                                            columns=train_corruptions_string)
-            max_report_frame.to_csv(
-                os.path.abspath(f'{self.results_folder}_metrics_test_max.csv'), index=True, header=True,
-                sep=';', float_format='%1.4f', decimal=',')
-            std_report_frame.to_csv(
-                os.path.abspath(f'{self.results_folder}_metrics_test_std.csv'), index=True, header=True,
-                sep=';', float_format='%1.4f', decimal=',')
 
-    def initialize(self, run, model):
+    def initialize(self, run):
         self.run = run
-        self.model = model
         self.accs = []
-
-        if self.combine_train_corruptions:
-            print(f"Run {run}, evaluating combined model ")
-            self.fileaddition = f'_'
-        else:
-            train_corruption = self.train_corruptions[model]
-            print(f"Run {run}, evaluating model trained on noise of type:", train_corruption)
-            self.fileaddition = f'_{train_corruption["noise_type"]}_eps_{train_corruption["epsilon"]}_' \
-                           f'{train_corruption["sphere"]}_'
+        print(f"Evaluating training run {run}")
         self.filename = os.path.abspath(f'../trained_models/{self.dataset}/{self.modeltype}/config{self.experiment}' \
-                   f'{self.fileaddition}run_{run}.pth')
+                   f'_run_{run}.pth')
 
     def track_results(self, new_results):
         for element in new_results:
             self.accs.append(element)
-        self.all_test_metrics[:len(self.accs), self.model, self.run] = np.array(self.accs)
+        self.all_test_metrics[:len(self.accs), self.run] = np.array(self.accs)
 
     def save_adv_distance(self, dist_sorted, adv_distance_params):
 
