@@ -20,7 +20,7 @@ if __name__ == '__main__':
             run_iter = [0]
 
         for run in run_iter:
-            if experiment in [192] and run in [0]:
+            if experiment in [] and run in [0]:
                 resume = True
             else:
                 resume = False

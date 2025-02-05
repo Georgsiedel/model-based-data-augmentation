@@ -197,7 +197,7 @@ class DatasetStyleTransforms:
         num_images = len(dataset)
         num_stylized = int(num_images * self.stylized_ratio)
         stylized_indices = torch.randperm(num_images)[:num_stylized]
-
+        
         # Create a Subset with the stylized indices
         stylized_subset = Subset(dataset, stylized_indices)
 
@@ -205,18 +205,16 @@ class DatasetStyleTransforms:
         loader = DataLoader(stylized_subset, batch_size=self.batch_size, shuffle=False)
         
         # Use zeros as placeholders for non-stylized images and labels
-        sample_image, sample_label = dataset[0]  # Get sample shape from the dataset
+        sample_image, _ = dataset[0]  # Get sample shape from the dataset
         stylized_images = torch.zeros((num_stylized, *sample_image.shape), dtype=sample_image.dtype)
-        stylized_labels = torch.zeros((num_stylized,), dtype=torch.long if isinstance(sample_label, int) else sample_label.dtype)
 
         # Iterate over the DataLoader and process stylized images
-        for batch_indices, (images, labels) in zip(stylized_indices.split(self.batch_size), loader):
+        for batch_indices, (images, _) in zip(loader.batch_sampler, loader):  
             # Apply the transformation to the batch
             transformed_images = self.transform_style(images)
 
             # Store the transformed images and labels in their original positions
             stylized_images[batch_indices] = transformed_images
-            stylized_labels[batch_indices] = labels
 
         # Delete intermediary variables to save memory
         del loader, stylized_subset
@@ -227,7 +225,7 @@ class DatasetStyleTransforms:
         style_mask = style_mask.tolist()
 
         # Return the stylized dataset
-        return StylizedTensorDataset(dataset, stylized_images, stylized_labels, stylized_indices), style_mask
+        return StylizedTensorDataset(dataset, stylized_images, stylized_indices), style_mask
 
 class DatasetStyleTransforms_old:
     def __init__(self, stylized_ratio, batch_size, transform_style):

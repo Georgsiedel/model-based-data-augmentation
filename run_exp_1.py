@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
         runs = 3
-        run_iter = [0,1,2]
+        run_iter = [0,1]
 
         for run in run_iter:
             if experiment in [194] and run in [0]:

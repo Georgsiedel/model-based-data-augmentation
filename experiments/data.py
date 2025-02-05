@@ -78,7 +78,15 @@ class GeneratedDataset(Dataset):
         self.transform = transform
 
     def __len__(self):
-        return len(self.images)
+        return len(self.labels)
+    
+    def getclean(self, idx):#for robust loss, called in AugmentedDataset class
+        image = self.images[idx]
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image
 
     def __getitem__(self, idx):
         image = self.images[idx]
@@ -90,7 +98,7 @@ class GeneratedDataset(Dataset):
         return image, label
     
 class StylizedTensorDataset(Dataset):
-    def __init__(self, dataset, stylized_images, stylized_labels, stylized_indices):
+    def __init__(self, dataset, stylized_images, stylized_indices):
         """
         A dataset class that maps indices of the original dataset to stylized data when available.
 
@@ -102,7 +110,6 @@ class StylizedTensorDataset(Dataset):
         """
         self.dataset = dataset
         self.stylized_images = stylized_images
-        self.stylized_labels = stylized_labels
         self.stylized_indices = set(stylized_indices)  # Convert to set for O(1) lookup
 
         # Map original dataset indices to the stylized dataset
@@ -110,15 +117,21 @@ class StylizedTensorDataset(Dataset):
 
     def __len__(self):
         return len(self.dataset)
+        
+    def getclean(self, idx):#for robust loss, called in AugmentedDataset class
+        x, _ = self.dataset[idx]
+        return x
 
     def __getitem__(self, idx):
         if idx in self.stylized_indices:
             # Fetch data from the stylized dataset
             stylized_idx = self.index_map[idx]
-            return self.stylized_images[stylized_idx], self.stylized_labels[stylized_idx]
+            x = self.stylized_images[stylized_idx]
+            _, y = self.dataset[idx]
         else:
+            x, y = self.dataset[idx]
             # Fetch data from the original dataset
-            return self.dataset[idx]
+        return x, y
 
 class SubsetWithTransform(Dataset):
     def __init__(self, subset, transform):
@@ -127,6 +140,12 @@ class SubsetWithTransform(Dataset):
 
     def __len__(self):
         return len(self.subset)
+
+    def getclean(self, idx):#for robust loss, called in AugmentedDataset class
+        image, _ = self.subset[idx]
+        if self.transform:
+            image = self.transform(image)
+        return image
 
     def __getitem__(self, idx):
         image, label = self.subset[idx]
@@ -227,7 +246,7 @@ class GroupedAugmentedDataset(torch.utils.data.Dataset):
         self.group_size = group_size
 
         self.num_original = len(original_dataset) if original_dataset else 0
-        self.num_generated = len(generated_dataset['images']) if generated_dataset else 0
+        self.num_generated = len(generated_dataset['labels']) if generated_dataset else 0
         self.total_size = self.num_original + self.num_generated
 
         # Create groups for original and generated indices like in the Batch Sampler
@@ -355,15 +374,13 @@ class BalancedRatioSampler(Sampler):
 class AugmentedDataset(torch.utils.data.Dataset):
     """Dataset wrapper to perform augmentations and allow robust loss functions."""
 
-    def __init__(self, original_dataset, stylized_original_dataset, generated_dataset, stylized_generated_dataset, style_mask_orig, 
-                 style_mask_gen, transforms_basic, transforms_orig_after_style, transforms_gen_after_style, 
+    def __init__(self, stylized_original_dataset, stylized_generated_dataset, style_mask, 
+                 transforms_basic, transforms_orig_after_style, transforms_gen_after_style, 
                  transforms_orig_after_nostyle, transforms_gen_after_nostyle, robust_samples=0):
-        self.original_dataset = original_dataset
         self.stylized_original_dataset = stylized_original_dataset
-        self.generated_dataset = generated_dataset
         self.stylized_generated_dataset = stylized_generated_dataset
-        self.style_mask_orig = style_mask_orig
-        self.style_mask_gen = style_mask_gen
+        self.style_mask = style_mask
+        assert len(style_mask) == len(stylized_original_dataset) + len(stylized_generated_dataset)
         self.transforms_basic = transforms_basic
         self.transforms_orig_after_style = transforms_orig_after_style
         self.transforms_gen_after_style = transforms_gen_after_style
@@ -371,52 +388,38 @@ class AugmentedDataset(torch.utils.data.Dataset):
         self.transforms_gen_after_nostyle = transforms_gen_after_nostyle
         self.robust_samples = robust_samples
 
-        self.num_original = len(original_dataset) if original_dataset else 0
-        self.num_generated = len(generated_dataset) if generated_dataset else 0
+        self.num_original = len(stylized_original_dataset) if stylized_original_dataset else 0
+        self.num_generated = len(stylized_generated_dataset) if stylized_generated_dataset else 0
         self.total_size = self.num_original + self.num_generated
 
     def __getitem__(self, idx):
 
+        is_stylized = self.style_mask[idx]
+
         if idx < self.num_original:
-            
-            is_generated = False
-            is_stylized = self.style_mask_orig[idx] if self.style_mask_orig is not None else False
-            x, y = self.stylized_original_dataset[idx] if is_stylized else self.original_dataset[idx]
+            x, y = self.stylized_original_dataset[idx]
+            aug = self.transforms_orig_after_style if is_stylized else self.transforms_orig_after_nostyle
         else:
-            is_generated = True
-            is_stylized = self.style_mask_gen[idx - self.num_original] if self.style_mask_gen is not None else False
-            x, y = self.stylized_generated_dataset[idx - self.num_original] if is_stylized else self.generated_dataset[idx - self.num_original]
+            x, y = self.stylized_generated_dataset[idx - self.num_original]
             #x = Image.fromarray(self.stylized_generated_dataset['images'][idx - self.num_original]) if is_stylized else Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
             #y = self.generated_dataset['labels'][idx - self.num_original]
-
-        if is_generated:
             aug = self.transforms_gen_after_style if is_stylized else self.transforms_gen_after_nostyle
-        else:
-            aug = self.transforms_orig_after_style if is_stylized else self.transforms_orig_after_nostyle
 
         augment = transforms.Compose([self.transforms_basic, aug])
-
 
         if self.robust_samples == 0:
             return augment(x), int(y)
     
-        elif self.robust_samples == 1:
+        elif self.robust_samples >= 1:
             if idx < self.num_original:
-                x0, _ = self.original_dataset[idx]
+                x0 = self.stylized_original_dataset.getclean(idx)
             else:
-                x0 = Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
+                x0 = self.stylized_generated_dataset.getclean(idx - self.num_original)
 
-            x_tuple = (x0, augment(x))
-            return x_tuple, int(y)
-        
-        elif self.robust_samples == 2:
-            if idx < self.num_original:
-                x0, _ = self.original_dataset[idx]
-            else:
-                x0 = Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
-
-            x_tuple = (x0, augment(x), augment(x))
-            return x_tuple, int(y)
+            if self.robust_samples == 1:
+                return (x0, augment(x)), int(y)
+            elif self.robust_samples == 2:
+                return (x0, augment(x), augment(x)), int(y)
 
     def __len__(self):
         return self.total_size
@@ -536,17 +539,19 @@ class DataLoading():
             if self.stylization_orig is not None:
                 stylized_original_subset, style_mask_orig = self.stylization_orig(original_subset)
             else: 
-                stylized_original_subset, style_mask_orig = None, None
+                stylized_original_subset, style_mask_orig = original_subset, [False] * len(original_subset)
         else:
-            original_subset, stylized_original_subset, style_mask_orig = None, None, None
-
+            stylized_original_subset, style_mask_orig = None, []
+        
         if self.num_generated > 0 and self.generated_dataset is not None:
-            generated_indices = torch.randperm(len(self.generated_dataset['image']))[:self.num_generated]
+            generated_indices = np.random.choice(len(self.generated_dataset['label']), size=self.num_generated, replace=False)
+
             generated_subset = GeneratedDataset(
                 self.generated_dataset['image'][generated_indices],
                 self.generated_dataset['label'][generated_indices],
                 transform=self.transforms_preprocess
             )
+
             #generated_subset = {
             #    'images': self.generated_dataset['image'][generated_indices],
             #    'labels': self.generated_dataset['label'][generated_indices]
@@ -555,12 +560,13 @@ class DataLoading():
             if self.stylization_gen is not None:
                 stylized_generated_subset, style_mask_gen = self.stylization_gen(generated_subset)
             else:
-                stylized_generated_subset, style_mask_gen = None, None
+                stylized_generated_subset, style_mask_gen = generated_subset, [False] * len(generated_subset)
         else:
-            generated_subset, stylized_generated_subset, style_mask_gen = None, None, None
+            stylized_generated_subset, style_mask_gen = None, []
         
-        self.trainset = AugmentedDataset(original_subset, stylized_original_subset, generated_subset, stylized_generated_subset, 
-                                         style_mask_orig, style_mask_gen,
+        style_mask = style_mask_orig + style_mask_gen
+        
+        self.trainset = AugmentedDataset(stylized_original_subset, stylized_generated_subset, style_mask,
                                          self.transforms_basic, self.transforms_orig_after_style, self.transforms_gen_after_style, 
                                         self.transforms_orig_after_nostyle, self.transforms_gen_after_nostyle, self.robust_samples)
 
