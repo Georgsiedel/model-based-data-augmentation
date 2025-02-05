@@ -71,7 +71,6 @@ class NSTTransform(transforms.Transform):
         self.alpha_min = alpha_min
         self.alpha_max = alpha_max
         self.upsample = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
-        self.downsample = nn.Upsample(size=(pixels, pixels), mode='bilinear', align_corners=False)
         self.to_tensor = transforms.Compose([transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True)])
         self.style_features = style_feats
         self.num_styles = len(style_feats)
@@ -91,15 +90,20 @@ class NSTTransform(transforms.Transform):
         if single_image:
             x = x.unsqueeze(0)
         
-        x = self.upsample(x)
+        _, _, H, W = x.shape
+
+        if (H, W) != (224, 224):
+            x = self.upsample(x)
 
         idy = torch.randperm(self.num_styles)[0:ratio]
         idx = torch.randperm(x.size(0))[0:ratio]
 
         x = x.to(nst_device)
         x[idx] = self.style_transfer(self.vgg, self.decoder, x[idx], self.style_features[idy])
-        x = x.cpu()
-        stl_imgs = self.downsample(x)
+        stl_imgs = x.cpu()
+
+        if (H, W) != (224, 224):
+            stl_imgs = nn.Upsample(size=(H, W), mode='bilinear', align_corners=False)(stl_imgs)
 
         #stl_imgs = self.norm_style_tensor(stl_imgs)
 

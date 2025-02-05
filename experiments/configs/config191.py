@@ -23,7 +23,7 @@ validonc = True
 validonadv = False
 lrschedule = 'CosineAnnealingWarmRestarts'
 learningrate = 0.0001
-epochs = 30
+epochs = 20
 lrparams = {'T_0': 20, 'T_mult': 2}
 warmupepochs = 0
 earlystop = False
@@ -47,7 +47,7 @@ mixup = {'alpha': 0.2, 'p': 0.0} #default alpha 0.2 #If both mixup and cutmix ar
 cutmix = {'alpha': 1.0, 'p': 0.0} # default alpha 1.0 #If both mixup and cutmix are >0, mixup or cutmix are selected by 0.5 chance
 manifold = {'apply': False, 'noise_factor': 3}
 RandomEraseProbability = 0.3
-swa = {'apply': True, 'start_factor': 0.8, 'lr_factor': 0.2}
+swa = {'apply': True, 'start_factor': 0.7, 'lr_factor': 0.2}
 
 #define train and test corruptions:
 #define noise type (first column): 'gaussian', 'uniform-l0-impulse', 'uniform-l0-salt-pepper', 'uniform-linf'. also: all positive numbers p>0 for uniform Lp possible: 'uniform-l1', 'uniform-l2', ...

@@ -125,6 +125,7 @@ def train_epoch(pbar):
     model.train()
     correct, total, train_loss, avg_train_loss = 0, 0, 0, 0
     for batch_idx, (inputs, targets) in enumerate(trainloader):
+
         optimizer.zero_grad()
         if criterion.robust_samples >= 1:
             inputs = torch.cat(inputs, 0)

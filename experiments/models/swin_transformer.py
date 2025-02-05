@@ -20,7 +20,7 @@ from torchvision.models._utils import _ovewrite_named_param, handle_legacy_inter
 __all__ = [
     "SwinTransformer",
     "Swin_V2_T_Weights",
-    "swin_v2_t",
+    "Swin_V2_T",
 ]
 
 
@@ -704,9 +704,8 @@ class Swin_V2_T_Weights(WeightsEnum):
     )
     DEFAULT = IMAGENET1K_V1
 
-@register_model()
 @handle_legacy_interface(weights=("pretrained", Swin_V2_T_Weights.IMAGENET1K_V1))
-def swin_v2_t(*, weights: Optional[Swin_V2_T_Weights] = None, dataset: str, normalized: bool, num_classes: int, progress: bool = True, **kwargs: Any) -> SwinTransformer:
+def Swin_V2_T(*, weights: Optional[Swin_V2_T_Weights] = None, dataset: str, normalized: bool, num_classes: int, progress: bool = True, **kwargs: Any) -> SwinTransformer:
     """
     Constructs a swin_v2_tiny architecture from
     `Swin Transformer V2: Scaling Up Capacity and Resolution <https://arxiv.org/abs/2111.09883>`_.

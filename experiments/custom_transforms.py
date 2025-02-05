@@ -2,10 +2,11 @@ import random
 import torch
 import torch.cuda.amp
 import torch.utils
-import torch.utils.data
+from torch.utils.data import Dataset, DataLoader, Subset, TensorDataset
 import torchvision.transforms.v2 as transforms_v2
 import torchvision.transforms as transforms
 from run_exp import device
+import gc
 
 import torch
 from torchvision.transforms import ToTensor, ToPILImage
@@ -13,7 +14,7 @@ import numpy as np
 import time
 from experiments.utils import plot_images
 import experiments.style_transfer as style_transfer
-
+from experiments.data import StylizedTensorDataset
 
 def get_transforms_map(strat_name, re, dataset, factor):
     TAc = CustomTA_color()
@@ -72,6 +73,9 @@ def get_transforms_map(strat_name, re, dataset, factor):
         "StyleTransfer50alpha05-10": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=1.0, alpha_min=0.5, alpha_max=1.0)), 
                             re,
                             re),  
+        "StyleTransfer50alpha04-07": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=1.0, alpha_min=0.4, alpha_max=0.7)), 
+                            re,
+                            re),
         "StyleTransfer50alpha05-08": (DatasetStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=stylization(dataset, factor, probability=1.0, alpha_min=0.5, alpha_max=0.8)), 
                             re,
                             re),
@@ -162,8 +166,70 @@ def get_transforms_map(strat_name, re, dataset, factor):
 
     return transforms_stylization, transforms_after_style, transforms_after_nostyle
 
-
 class DatasetStyleTransforms:
+    def __init__(self, transform_style, batch_size, stylized_ratio):
+        """
+        Args:
+            transform_style: Callable to apply stylization.
+            batch_size: Batch size for tensors passed to transform_style.
+            stylized_ratio: Fraction of images to stylize (0 to 1).
+        """
+        self.transform_style = transform_style
+        self.batch_size = batch_size
+        self.stylized_ratio = stylized_ratio
+        self.is_lazy_loaded = False
+
+
+    def __call__(self, dataset):
+        """
+        Stylize a fraction of images in the dataset and return a new dataset.
+
+        Args:
+            dataset: PyTorch Dataset to process.
+
+        Returns:
+            stylized_dataset: A new TensorDataset with stylized images.
+        """
+        if not self.is_lazy_loaded and callable(self.transform_style): #for calling the transform from a dictionary
+            self.transform_style = self.transform_style()
+            self.is_lazy_loaded = True
+
+        num_images = len(dataset)
+        num_stylized = int(num_images * self.stylized_ratio)
+        stylized_indices = torch.randperm(num_images)[:num_stylized]
+
+        # Create a Subset with the stylized indices
+        stylized_subset = Subset(dataset, stylized_indices)
+
+        # DataLoader for processing the stylized subset
+        loader = DataLoader(stylized_subset, batch_size=self.batch_size, shuffle=False)
+        
+        # Use zeros as placeholders for non-stylized images and labels
+        sample_image, sample_label = dataset[0]  # Get sample shape from the dataset
+        stylized_images = torch.zeros((num_stylized, *sample_image.shape), dtype=sample_image.dtype)
+        stylized_labels = torch.zeros((num_stylized,), dtype=torch.long if isinstance(sample_label, int) else sample_label.dtype)
+
+        # Iterate over the DataLoader and process stylized images
+        for batch_indices, (images, labels) in zip(stylized_indices.split(self.batch_size), loader):
+            # Apply the transformation to the batch
+            transformed_images = self.transform_style(images)
+
+            # Store the transformed images and labels in their original positions
+            stylized_images[batch_indices] = transformed_images
+            stylized_labels[batch_indices] = labels
+
+        # Delete intermediary variables to save memory
+        del loader, stylized_subset
+        gc.collect()
+
+        style_mask = torch.zeros(num_images, dtype=torch.bool)
+        style_mask[stylized_indices] = True
+        style_mask = style_mask.tolist()
+
+        # Return the stylized dataset
+        return StylizedTensorDataset(dataset, stylized_images, stylized_labels, stylized_indices), style_mask
+
+class DatasetStyleTransforms_old:
     def __init__(self, stylized_ratio, batch_size, transform_style):
         """
         Initializes the DatasetStyleTransformer.
@@ -193,7 +259,7 @@ class DatasetStyleTransforms:
             self.transform_style = self.transform_style()
             self.is_lazy_loaded = True
 
-        if isinstance(dataset, torch.utils.data.Subset):
+        if isinstance(dataset, Subset):
             # Handle PyTorch Subset
             subset_indices = dataset.indices
 
@@ -234,7 +300,7 @@ class DatasetStyleTransforms:
         style_mask = style_mask.tolist()
 
         # Convert back to original format (e.g., PIL or numpy array)
-        if isinstance(dataset, torch.utils.data.Subset):
+        if isinstance(dataset, Subset):
             stylized_images = (stylized_images*255).to(torch.uint8).permute(0, 2, 3, 1)
             for idx, stylized_image in zip(stylized_indices, stylized_images):
                 images[idx] = stylized_image.numpy()

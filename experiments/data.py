@@ -1,6 +1,7 @@
 import random
 import os
 import time
+import gc
 
 import torch
 from PIL import Image
@@ -11,7 +12,6 @@ from sklearn.model_selection import train_test_split
 import torchvision
 from torch.utils.data import Subset, Dataset, ConcatDataset, RandomSampler, BatchSampler, Sampler, DataLoader
 import numpy as np
-import style_transfer
 import experiments.custom_transforms as custom_transforms
 from run_exp import device
 
@@ -70,6 +70,69 @@ class SwaLoader():
         )
 
         return swa_dataloader
+    
+class GeneratedDataset(Dataset):
+    def __init__(self, images, labels, transform=None):
+        self.images = images
+        self.labels = labels
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        image = self.images[idx]
+        label = int(self.labels[idx])
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label
+    
+class StylizedTensorDataset(Dataset):
+    def __init__(self, dataset, stylized_images, stylized_labels, stylized_indices):
+        """
+        A dataset class that maps indices of the original dataset to stylized data when available.
+
+        Args:
+            dataset (torchvision.dataset): original dataset
+            stylized_images (torch.Tensor): Tensor of stylized images.
+            stylized_labels (torch.Tensor): Tensor of stylized labels.
+            stylized_indices (list[int]): List of indices in the original dataset that correspond to stylized data.
+        """
+        self.dataset = dataset
+        self.stylized_images = stylized_images
+        self.stylized_labels = stylized_labels
+        self.stylized_indices = set(stylized_indices)  # Convert to set for O(1) lookup
+
+        # Map original dataset indices to the stylized dataset
+        self.index_map = {orig_idx: i for i, orig_idx in enumerate(stylized_indices)}
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        if idx in self.stylized_indices:
+            # Fetch data from the stylized dataset
+            stylized_idx = self.index_map[idx]
+            return self.stylized_images[stylized_idx], self.stylized_labels[stylized_idx]
+        else:
+            # Fetch data from the original dataset
+            return self.dataset[idx]
+
+class SubsetWithTransform(Dataset):
+    def __init__(self, subset, transform):
+        self.subset = subset
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.subset)
+
+    def __getitem__(self, idx):
+        image, label = self.subset[idx]
+        if self.transform:
+            image = self.transform(image)
+        return image, label
 
 class CustomDataset(Dataset):
     def __init__(self, np_images, original_dataset, resize):
@@ -288,11 +351,12 @@ class BalancedRatioSampler(Sampler):
     def __len__(self):
         return (self.size + self.batch_size - 1) // self.batch_size
 
+
 class AugmentedDataset(torch.utils.data.Dataset):
     """Dataset wrapper to perform augmentations and allow robust loss functions."""
 
     def __init__(self, original_dataset, stylized_original_dataset, generated_dataset, stylized_generated_dataset, style_mask_orig, 
-                 style_mask_gen, transforms_preprocess, transforms_basic, transforms_orig_after_style, transforms_gen_after_style, 
+                 style_mask_gen, transforms_basic, transforms_orig_after_style, transforms_gen_after_style, 
                  transforms_orig_after_nostyle, transforms_gen_after_nostyle, robust_samples=0):
         self.original_dataset = original_dataset
         self.stylized_original_dataset = stylized_original_dataset
@@ -300,7 +364,6 @@ class AugmentedDataset(torch.utils.data.Dataset):
         self.stylized_generated_dataset = stylized_generated_dataset
         self.style_mask_orig = style_mask_orig
         self.style_mask_gen = style_mask_gen
-        self.preprocess = transforms_preprocess
         self.transforms_basic = transforms_basic
         self.transforms_orig_after_style = transforms_orig_after_style
         self.transforms_gen_after_style = transforms_gen_after_style
@@ -309,7 +372,7 @@ class AugmentedDataset(torch.utils.data.Dataset):
         self.robust_samples = robust_samples
 
         self.num_original = len(original_dataset) if original_dataset else 0
-        self.num_generated = len(generated_dataset['images']) if generated_dataset else 0
+        self.num_generated = len(generated_dataset) if generated_dataset else 0
         self.total_size = self.num_original + self.num_generated
 
     def __getitem__(self, idx):
@@ -322,18 +385,20 @@ class AugmentedDataset(torch.utils.data.Dataset):
         else:
             is_generated = True
             is_stylized = self.style_mask_gen[idx - self.num_original] if self.style_mask_gen is not None else False
-            x = Image.fromarray(self.stylized_generated_dataset['images'][idx - self.num_original]) if is_stylized else Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
-            y = self.generated_dataset['labels'][idx - self.num_original]
+            x, y = self.stylized_generated_dataset[idx - self.num_original] if is_stylized else self.generated_dataset[idx - self.num_original]
+            #x = Image.fromarray(self.stylized_generated_dataset['images'][idx - self.num_original]) if is_stylized else Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
+            #y = self.generated_dataset['labels'][idx - self.num_original]
 
         if is_generated:
             aug = self.transforms_gen_after_style if is_stylized else self.transforms_gen_after_nostyle
         else:
             aug = self.transforms_orig_after_style if is_stylized else self.transforms_orig_after_nostyle
 
-        augment = transforms.Compose([self.preprocess, self.transforms_basic, aug])
+        augment = transforms.Compose([self.transforms_basic, aug])
+
 
         if self.robust_samples == 0:
-            return augment(x), y
+            return augment(x), int(y)
     
         elif self.robust_samples == 1:
             if idx < self.num_original:
@@ -341,8 +406,8 @@ class AugmentedDataset(torch.utils.data.Dataset):
             else:
                 x0 = Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
 
-            x_tuple = (self.preprocess(x0), augment(x))
-            return x_tuple, y
+            x_tuple = (x0, augment(x))
+            return x_tuple, int(y)
         
         elif self.robust_samples == 2:
             if idx < self.num_original:
@@ -350,8 +415,8 @@ class AugmentedDataset(torch.utils.data.Dataset):
             else:
                 x0 = Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
 
-            x_tuple = (self.preprocess(x0), augment(x), augment(x))
-            return x_tuple, y
+            x_tuple = (x0, augment(x), augment(x))
+            return x_tuple, int(y)
 
     def __len__(self):
         return self.total_size
@@ -406,22 +471,22 @@ class DataLoading():
         # Trainset and Validset
         if self.test_only == False:
             if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                self.base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train'))
+                base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train'))
             else:
                 load_helper = getattr(torchvision.datasets, self.dataset)
-                self.base_trainset = load_helper(root=os.path.abspath('../data'), train=True, download=True)
+                base_trainset = load_helper(root=os.path.abspath('../data'), train=True, download=True)
 
             if validontest == False:
                 validsplit = 0.2
                 train_indices, val_indices, _, _ = train_test_split(
-                    range(len(self.base_trainset)),
-                    self.base_trainset.targets,
-                    stratify=self.base_trainset.targets,
+                    range(len(base_trainset)),
+                    base_trainset.targets,
+                    stratify=base_trainset.targets,
                     test_size=validsplit,
                     random_state=run)  # same validation split for same runs, but new validation on multiple runs
-                self.base_trainset = Subset(self.base_trainset, train_indices)
-                self.validset = Subset(self.base_trainset, val_indices)
-                self.validset = list(map(self.transforms_preprocess, self.validset))
+                self.base_trainset = Subset(base_trainset, train_indices)
+                validset = Subset(base_trainset, val_indices)
+                self.validset = [(self.transforms_preprocess(data), target) for data, target in validset]
             else:
                 if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
                     self.validset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/val'),
@@ -432,6 +497,7 @@ class DataLoading():
                                            transform=self.transforms_preprocess)
                 else:
                     print('Dataset not loadable')
+                self.base_trainset = base_trainset
         else:
             self.trainset = None
             self.validset = None
@@ -464,7 +530,9 @@ class DataLoading():
 
         if self.num_original > 0:
             original_indices = torch.randperm(len(self.base_trainset))[:self.num_original]
-            original_subset = Subset(self.base_trainset, original_indices)
+            original_subset = SubsetWithTransform(Subset(self.base_trainset, original_indices), self.transforms_preprocess)
+            #original_subset = Subset(self.base_trainset, original_indices)
+
             if self.stylization_orig is not None:
                 stylized_original_subset, style_mask_orig = self.stylization_orig(original_subset)
             else: 
@@ -474,10 +542,15 @@ class DataLoading():
 
         if self.num_generated > 0 and self.generated_dataset is not None:
             generated_indices = torch.randperm(len(self.generated_dataset['image']))[:self.num_generated]
-            generated_subset = {
-                'images': self.generated_dataset['image'][generated_indices],
-                'labels': self.generated_dataset['label'][generated_indices]
-            }
+            generated_subset = GeneratedDataset(
+                self.generated_dataset['image'][generated_indices],
+                self.generated_dataset['label'][generated_indices],
+                transform=self.transforms_preprocess
+            )
+            #generated_subset = {
+            #    'images': self.generated_dataset['image'][generated_indices],
+            #    'labels': self.generated_dataset['label'][generated_indices]
+            #}
 
             if self.stylization_gen is not None:
                 stylized_generated_subset, style_mask_gen = self.stylization_gen(generated_subset)
@@ -485,9 +558,9 @@ class DataLoading():
                 stylized_generated_subset, style_mask_gen = None, None
         else:
             generated_subset, stylized_generated_subset, style_mask_gen = None, None, None
-
+        
         self.trainset = AugmentedDataset(original_subset, stylized_original_subset, generated_subset, stylized_generated_subset, 
-                                         style_mask_orig, style_mask_gen, self.transforms_preprocess, 
+                                         style_mask_orig, style_mask_gen,
                                          self.transforms_basic, self.transforms_orig_after_style, self.transforms_gen_after_style, 
                                         self.transforms_orig_after_nostyle, self.transforms_gen_after_nostyle, self.robust_samples)
 
@@ -553,9 +626,9 @@ class DataLoading():
         else:
             self.CustomSampler = BatchSampler(RandomSampler(self.trainset), batch_size=batchsize, drop_last=False)
 
-        self.trainloader = DataLoader(self.trainset, pin_memory=False, batch_sampler=self.CustomSampler,
+        self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
                                       num_workers=number_workers, worker_init_fn=seed_worker, 
-                                        generator=g, persistent_workers=True)
+                                        generator=g, persistent_workers=False)
 
         self.validationloader = DataLoader(self.validset, batch_size=batchsize, pin_memory=False, num_workers=0)
 
@@ -564,11 +637,17 @@ class DataLoading():
     def update_trainset(self, epoch, start_epoch):
 
         if (self.generated_ratio != 0.0 or self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
+                        
+            del self.trainset
+
             self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
+        
+        del self.trainloader
+        gc.collect()
 
         g = torch.Generator()
         g.manual_seed(self.epoch + self.epochs * self.run)
-        self.trainloader = DataLoader(self.trainset, batch_sampler=self.CustomSampler, pin_memory=False, 
+        self.trainloader = DataLoader(self.trainset, batch_sampler=self.CustomSampler, pin_memory=True, 
                                       num_workers=self.number_workers, worker_init_fn=seed_worker,
-                                      generator=g, persistent_workers=True)
+                                      generator=g, persistent_workers=False)
         return self.trainloader
