@@ -12,8 +12,7 @@ import torch.distributions as dist
 from data import normalization_values
 from utils import plot_images
 from itertools import chain
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+from run_exp import device
 
 def random_erasing_style_mask(batch, noise_patch_lower_scale=0.3, noise_patch_upper_scale=1.0, ratio=[0.3, 3.3]):
         """Get image mask for Patched Noise. Rectangle fully inside the image, as in RandomErasing
@@ -91,12 +90,8 @@ def apply_noise_add_and_mult(batch, minibatchsize, corruptions, normalized, data
     minibatches = batch.view(-1, minibatchsize, batch.size()[1], batch.size()[2], batch.size()[3])
     new_batches = []
     for id, minibatch in enumerate(minibatches):
-        #no dict means corruption combination, so we choose randomly, dict means one single corruption
-        if not isinstance(corruptions, dict): #in case of a combination of corruptions (combined_corruption = True)
-            corruptions_list = random.sample(list(corruptions), k=2)
-        else:
-            corruptions_list = [corruptions]
-
+        
+        corruptions_list = random.sample(list(corruptions), k=2)
         clean = minibatch.clone()
 
         for id, (corruption) in enumerate(corruptions_list):
@@ -248,11 +243,7 @@ def apply_noise(batch, minibatchsize, corruptions, concurrent_combinations, norm
     minibatches = chain(full_minibatches, [residual_batch] if residual_batch is not None else [])
 
     for id, minibatch in enumerate(minibatches):
-        #no dict means corruption combination, so we choose randomly, dict means one single corruption
-        if not isinstance(corruptions, dict): #in case of a combination of corruptions (combined_corruption = True)
-            corruptions_list = random.sample(list(corruptions), k=concurrent_combinations)
-        else:
-            corruptions_list = [corruptions]
+        corruptions_list = random.sample(list(corruptions), k=concurrent_combinations)
 
         #noisy_minibatch = torch.clone(minibatch)
         for _, (corruption) in enumerate(corruptions_list):

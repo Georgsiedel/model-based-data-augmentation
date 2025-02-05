@@ -8,17 +8,15 @@ if module_path not in sys.path:
 
 import argparse
 import importlib
-from multiprocessing import freeze_support
 import torch.multiprocessing as mp
-
 import numpy as np
 from tqdm import tqdm
 import torch.amp
 import torch.optim as optim
 from torch.optim.swa_utils import AveragedModel, SWALR
 import torchvision.models as torchmodels
-import torchvision.transforms.v2 as transforms
 from experiments.utils import plot_images
+import time
 
 import data
 import utils
@@ -28,12 +26,8 @@ from eval_corruptions import compute_c_corruptions
 from eval_adversarial import fast_gradient_validation
 
 import torch.backends.cudnn as cudnn
-torch.cuda.empty_cache()
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-#torch.backends.cudnn.enabled = False #this may resolve some cuDNN errors, but increases training time by ~200%
+from run_exp import device
 if torch.cuda.is_available():
-    #torch.cuda.set_device(0)
     cudnn.benchmark = False #this slightly speeds up 32bit precision training (5%). False helps achieve reproducibility
     cudnn.deterministic = True
 
@@ -91,8 +85,6 @@ parser.add_argument('--cutmix', default={'alpha': 1.0, 'p': 0.0}, type=str, acti
                     'chosen without overlapping based on their probability, even if the sum of the probabilities is >1')
 parser.add_argument('--manifold', default={'apply': False, 'noise_factor': 4}, type=str, action=utils.str2dictAction, metavar='KEY=VALUE',
                     help='Choose whether to apply noisy mixup in manifold layers')
-parser.add_argument('--combine_train_corruptions', type=utils.str2bool, nargs='?', const=True, default=True,
-                    help='Whether to combine all training noise values by drawing from the randomly')
 parser.add_argument('--concurrent_combinations', default=1, type=int, help='How many of the training noise values should '
                     'be applied at once on one image. USe only if you defined multiple training noise values.')
 parser.add_argument('--number_workers', default=2, type=int, help='How many workers are launched to parallelize data '
@@ -126,22 +118,17 @@ parser.add_argument('--generated_ratio', default=0.0, type=float, help='ratio of
 args = parser.parse_args()
 configname = (f'experiments.configs.config{args.experiment}')
 config = importlib.import_module(configname)
-if args.combine_train_corruptions == True:
-    train_corruptions = config.train_corruptions
-else:
-    train_corruptions = args.train_corruptions
+train_corruptions = config.train_corruptions
 
 def train_epoch(pbar):
 
     model.train()
     correct, total, train_loss, avg_train_loss = 0, 0, 0, 0
-    for batch_idx, (inputs, targets, sources, apply_gpu_transform) in enumerate(trainloader):
+    for batch_idx, (inputs, targets) in enumerate(trainloader):
 
         optimizer.zero_grad()
         if criterion.robust_samples >= 1:
-            inputs = torch.cat((inputs[0], Dataloader.transforms_gpu(torch.cat(inputs[1:], 0), sources, apply_gpu_transform[1:])), 0)
-        else:
-            inputs = Dataloader.transforms_gpu(inputs, sources, apply_gpu_transform)
+            inputs = torch.cat(inputs, 0)
         
         inputs, targets = inputs.to(device, dtype=torch.float32), targets.to(device)
         with torch.amp.autocast(device_type=device):
@@ -226,7 +213,6 @@ if __name__ == '__main__':
     # Load and transform data
     print('Preparing data..')
 
-    freeze_support()
     mp.set_start_method('spawn', force=True)
 
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams
@@ -258,15 +244,15 @@ if __name__ == '__main__':
         scheduler = optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmupscheduler, scheduler], milestones=[args.warmupepochs])
 
     if args.swa['apply'] == True:
-        swa_model = AveragedModel(model)#.module
+        swa_model = AveragedModel(model)
         swa_start = args.epochs * args.swa['start_factor']
         swa_scheduler = SWALR(optimizer, anneal_strategy="linear", anneal_epochs=5, swa_lr=args.learningrate * args.swa['lr_factor'])
     else:
         swa_model, swa_scheduler = None, None
     Scaler = torch.amp.GradScaler(device=device)
-    Checkpointer = utils.Checkpoint(args.combine_train_corruptions, args.dataset, args.modeltype, args.experiment,
+    Checkpointer = utils.Checkpoint(args.dataset, args.modeltype, args.experiment,
                                     train_corruptions, args.run, earlystopping=args.earlystop, patience=args.earlystopPatience,
-                                    verbose=False,  checkpoint_path=f'../trained_models/checkpoint_{args.experiment}.pt')
+                                    verbose=False,  checkpoint_path=f'../trained_models/checkpoint_{args.experiment}_{args.run}.pt')
     Traintracker = utils.TrainTracking(args.dataset, args.modeltype, args.lrschedule, args.experiment, args.run,
                             args.validonc, args.validonadv, args.swa)
 
@@ -278,17 +264,24 @@ if __name__ == '__main__':
                                                                     optimizer, scheduler, swa_scheduler, 'standard')
         Traintracker.load_learning_curves()
         print('\nResuming from checkpoint after epoch', start_epoch)
-    # load augmented trainset and Dataloader
-    Dataloader.load_augmented_traindata(target_size=len(Dataloader.base_trainset),
-                                        epoch=start_epoch,
-                                        robust_samples=criterion.robust_samples)
-    trainloader, validationloader = Dataloader.get_loader(args.batchsize, args.number_workers)
-  
+    
     # Calculate steps and epochs
     total_steps, start_steps = utils.calculate_steps(args.dataset, args.batchsize, args.epochs, start_epoch, args.warmupepochs,
                                         args.validontest, args.validonc, args.swa['apply'], args.swa['start_factor'])
-    # Training loop
+    
     with tqdm(total=total_steps, initial=start_steps) as pbar:
+        
+        training_start_time = time.time()
+        if args.resume == True:
+            training_start_time = training_start_time - max(Traintracker.elapsed_time)
+    
+        # load augmented trainset and Dataloader
+        Dataloader.load_augmented_traindata(target_size=len(Dataloader.base_trainset),
+                                            epoch=start_epoch,
+                                            robust_samples=criterion.robust_samples)
+        trainloader, validationloader = Dataloader.get_loader(args.batchsize, args.number_workers)
+    
+        # Training loop
         with torch.autograd.set_detect_anomaly(False, check_nan=False): #this may resolve some Cuda/cuDNN errors.
             # check_nan=True increases 32bit precision train time by ~20% and causes errors due to nan values for mixed precision training.
             for epoch in range(start_epoch, end_epoch):
@@ -300,7 +293,7 @@ if __name__ == '__main__':
                 valid_acc, valid_loss, valid_acc_robust, valid_acc_adv = valid_epoch(pbar, model)
 
                 if args.swa['apply'] == True and (epoch + 1) > swa_start:
-                    swa_model.update_parameters(model) #.module
+                    swa_model.update_parameters(model)
                     swa_scheduler.step()
                     valid_acc_swa, valid_loss_swa, valid_acc_robust_swa, valid_acc_adv_swa = valid_epoch(pbar, swa_model)
                 else:
@@ -311,9 +304,10 @@ if __name__ == '__main__':
                     valid_acc_swa, valid_acc_robust_swa, valid_acc_adv_swa = valid_acc, valid_acc_robust, valid_acc_adv
 
                 # Check for best model, save model(s) and learning curve and check for earlystopping conditions
+                elapsed_time = time.time() - training_start_time
                 Checkpointer.earlystopping(valid_acc)
                 Checkpointer.save_checkpoint(model, swa_model, optimizer, scheduler, swa_scheduler, epoch)
-                Traintracker.save_metrics(train_acc, valid_acc, valid_acc_robust, valid_acc_adv, valid_acc_swa,
+                Traintracker.save_metrics(elapsed_time, train_acc, valid_acc, valid_acc_robust, valid_acc_adv, valid_acc_swa,
                              valid_acc_robust_swa, valid_acc_adv_swa, train_loss, valid_loss)
                 Traintracker.save_learning_curves()
                 if Checkpointer.early_stop:

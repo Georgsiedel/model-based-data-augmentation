@@ -17,16 +17,7 @@ import torch.nn as nn
 import torchvision.transforms.v2 as transforms
 import adaIN.model as adaINmodel
 import adaIN.utils as utils
-
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-    if torch.cuda.device_count() >= 2:
-        nst_device = torch.device('cuda') #'cuda:1'
-    else:
-        nst_device = torch.device('cuda')
-else:
-    device = torch.device('cpu')
-    nst_device = torch.device('cpu')
+from run_exp import device as nst_device
 
 encoder_rel_path = 'adaIN/vgg_normalised.pth'
 decoder_rel_path = 'adaIN/decoder.pth'
@@ -80,7 +71,6 @@ class NSTTransform(transforms.Transform):
         self.alpha_min = alpha_min
         self.alpha_max = alpha_max
         self.upsample = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
-        self.downsample = nn.Upsample(size=(pixels, pixels), mode='bilinear', align_corners=False)
         self.to_tensor = transforms.Compose([transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True)])
         self.style_features = style_feats
         self.num_styles = len(style_feats)
@@ -90,28 +80,37 @@ class NSTTransform(transforms.Transform):
     @torch.no_grad()
     def __call__(self, x):
 
-        x = x.to(nst_device)
+        single_image = True if x.ndimension() == 3 else False
 
-        x = self.upsample(x)
-        ratio = int(math.floor(x.size(0)*self.probability + random.random()))
+        batchsize = 1 if single_image else x.size(0)
+        ratio = int(math.floor(batchsize*self.probability + random.random()))
         if ratio == 0:
-            return self.downsample(x).to(device)
+            return x
         
+        if single_image:
+            x = x.unsqueeze(0)
+        
+        _, _, H, W = x.shape
+
+        if (H, W) != (224, 224):
+            x = self.upsample(x)
+
         idy = torch.randperm(self.num_styles)[0:ratio]
         idx = torch.randperm(x.size(0))[0:ratio]
+
+        x = x.to(nst_device)
         x[idx] = self.style_transfer(self.vgg, self.decoder, x[idx], self.style_features[idy])
+        stl_imgs = x.cpu()
 
-        stl_imgs = self.downsample(x)
-        #stl_imgs = stl_imgs.detach().cpu()
-        
-        # Create a boolean mask: True if image stylized, False if not
-        #stylized = torch.isin(torch.arange(stl_imgs.size(0)), idy)
+        if (H, W) != (224, 224):
+            stl_imgs = nn.Upsample(size=(H, W), mode='bilinear', align_corners=False)(stl_imgs)
 
-        stl_imgs = self.norm_style_tensor(stl_imgs)
+        #stl_imgs = self.norm_style_tensor(stl_imgs)
 
-        #stl_imgs = [self.to_pil_img(image) for image in stl_imgs]
+        if single_image:
+            stl_imgs = stl_imgs.squeeze(0)
 
-        return stl_imgs.to(device) #, stylized
+        return stl_imgs
 
     @torch.no_grad()
     def norm_style_tensor(self, tensor):

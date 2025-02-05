@@ -1,6 +1,5 @@
 {
 	"name": "Python 3 with CUDA 12.4 and cuDNN",
-	//"image": "nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04",
 	"image": "mcr.microsoft.com/devcontainers/python:3.11",
 	"features": {
 		"ghcr.io/devcontainers/features/nvidia-cuda:1": {
@@ -13,8 +12,7 @@
 		}
 	},
 	"runArgs": [
-		"--gpus", 
-		"all"
+		"--gpus=device=2"
 	],
 	"postCreateCommand": "pip3 install --user -r requirements.txt",
 	"containerEnv": {
