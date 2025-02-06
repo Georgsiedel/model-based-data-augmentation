@@ -156,6 +156,9 @@ class Checkpoint:
         self.early_stopping = earlystopping
         self.checkpoint_path = os.path.abspath(checkpoint_path)
         self.final_model_path = os.path.abspath(f'../trained_models/{dataset}/{modeltype}/config{experiment}_run_{run}.pth')
+        os.makedirs(os.path.dirname(self.checkpoint_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.final_model_path), exist_ok=True)
+
 
     def earlystopping(self, val_acc):
 
@@ -246,11 +249,17 @@ class TrainTracking:
         self.train_accs, self.train_losses, self.valid_accs, self.valid_losses, self.valid_accs_robust = [],[],[],[],[]
         self.valid_accs_adv, self.valid_accs_swa, self.valid_accs_robust_swa, self.valid_accs_adv_swa = [],[],[],[]
         self.elapsed_time = []
+        self.csv_path = os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_'
+                                           f'learning_curve_run_{self.run}.csv')
+        self.learningcurve_path = os.path.abspath(f'results/{self.dataset}/{self.modeltype}/config{self.experiment}_'
+                                                  f'learning_curve_run_{self.run}.svg')
+        self.config_src_path = os.path.abspath(f'./experiments/configs/config{self.experiment}.py')
+        self.config_dst_path = os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}.py')
+        os.makedirs(os.path.dirname(self.csv_path), exist_ok=True)
 
     def load_learning_curves(self):
 
-        learning_curve_frame = pd.read_csv(os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_'
-                                           f'learning_curve_run_{self.run}.csv'), sep=';', decimal=',')
+        learning_curve_frame = pd.read_csv(self.csv_path, sep=';', decimal=',')
         elapsed_time = learning_curve_frame.iloc[:, 0].values.tolist()
         train_accs = learning_curve_frame.iloc[:, 1].values.tolist()
         train_losses = learning_curve_frame.iloc[:, 2].values.tolist()
@@ -316,9 +325,7 @@ class TrainTracking:
                 columns = columns + 1
             if self.validonadv == True:
                 learning_curve_frame.insert(columns+1, "valid_accuracy_adversarial_swa", self.valid_accs_adv_swa)
-        learning_curve_frame.to_csv(os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_'
-                                    f'learning_curve_run_{self.run}.csv'),
-                                    index=False, header=True, sep=';', float_format='%1.4f', decimal=',')
+        learning_curve_frame.to_csv(self.csv_path, index=False, header=True, sep=';', float_format='%1.4f', decimal=',')
 
         x = list(range(1, len(self.train_accs) + 1))
         plt.figure()
@@ -345,12 +352,11 @@ class TrainTracking:
         plt.ylabel('Accuracy')
         plt.xticks(np.linspace(1, len(self.train_accs), num=10, dtype=int))
         plt.legend(loc='best')
-        plt.savefig(os.path.abspath(f'results/{self.dataset}/{self.modeltype}/config{self.experiment}_learning_curve_run_{self.run}.svg'))
+        plt.savefig(self.learningcurve_path)
         plt.close()
 
     def save_config(self):
-        shutil.copyfile(os.path.abspath(f'./experiments/configs/config{self.experiment}.py'),
-                        os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}.py'))
+        shutil.copyfile(self.config_src_path, self.config_dst_path)
 
     def print_results(self):
         print('Total training time: ', str(datetime.timedelta(seconds=max(self.elapsed_time))))
@@ -377,7 +383,8 @@ class TestTracking:
         self.calculate_autoattack_robustness = calculate_autoattack_robustness
         self.test_corruptions = test_corruptions
         self.adv_distance_params = adv_distance_params
-        self.results_folder = f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}'
+        self.report_path = os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_result_metrics.csv')
+        os.makedirs(os.path.dirname(self.report_path), exist_ok=True)
 
         self.eval_count = 1
         if self.runs > 1:
@@ -449,8 +456,7 @@ class TestTracking:
 
         report_frame = pd.DataFrame(self.test_metrics, index=test_metrics_string,
                                         columns=column_string)
-        report_frame.to_csv(os.path.abspath(f'{self.results_folder}_result_metrics.csv'), index=True, header=True,
-                                sep=';', float_format='%1.4f', decimal=',')
+        report_frame.to_csv(self.report_path, index=True, header=True, sep=';', float_format='%1.4f', decimal=',')
 
     def initialize(self, run):
         self.run = run
@@ -465,6 +471,10 @@ class TestTracking:
         self.all_test_metrics[:len(self.accs), self.run] = np.array(self.accs)
 
     def save_adv_distance(self, dist_sorted, adv_distance_params):
+
+        self.adv_report_path = os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_'
+                                  f'run_{self.run}_adversarial_distances.csv')
+        os.makedirs(os.path.dirname(self.adv_report_path), exist_ok=True)
 
         if adv_distance_params["clever"] == False:
             adv_distance_params["clever_batches"], adv_distance_params["clever_samples"] = [0.0], [0.0]
@@ -509,13 +519,12 @@ class TestTracking:
                 plt.legend()
                 plt.close()
 
-                adv_fig.savefig(os.path.abspath(f'results/{self.dataset}/{self.modeltype}/config{self.experiment}{self.fileaddition}run'
+                adv_fig.savefig(os.path.abspath(f'results/{self.dataset}/{self.modeltype}/config{self.experiment}_run'
                                 f'_{self.run}_adversarial_distances_{n}-norm_{samples}-CLEVER-samples.svg'))
                 adv_distance_frame.iloc[:, col_counter] = dist_sorted[:,len(adv_distance_params["norm"])*3+id*
                                                                      len(adv_distance_params["clever_batches"]) + j]
                 col_counter += 1
 
-        adv_distance_frame.to_csv(os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}{self.fileaddition}'
-                                  f'run_{self.run}_adversarial_distances.csv'),
+        adv_distance_frame.to_csv(self.adv_report_path,
                                   index=False, header=True, sep=';', float_format='%1.4f', decimal=',')
 
