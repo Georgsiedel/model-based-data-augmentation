@@ -458,15 +458,15 @@ class DataLoading():
             self.transforms_preprocess = transforms.Compose([t])
 
         # standard augmentations of training set, without tensor transformation
-        if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
+        if self.dataset == 'ImageNet':
+            self.transforms_basic = transforms.Compose([flip])
+        elif self.resize:
+            self.transforms_basic = transforms.Compose([flip, c224])
+        elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
             self.transforms_basic = transforms.Compose([flip, c32])
         elif self.dataset == 'TinyImageNet':
-            if self.resize:
-                self.transforms_basic = transforms.Compose([flip, c224])
-            else:
-                self.transforms_basic = transforms.Compose([flip, c64])
-        else:
-            self.transforms_basic = transforms.Compose([flip])
+            self.transforms_basic = transforms.Compose([flip, c64])
+
         self.stylization_orig, self.transforms_orig_after_style, self.transforms_orig_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_orig, re, self.dataset, self.factor)
         self.stylization_gen, self.transforms_gen_after_style, self.transforms_gen_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_gen, re, self.dataset, self.factor)
 
