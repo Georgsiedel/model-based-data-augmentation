@@ -18,6 +18,7 @@ import torchvision.transforms.v2 as transforms
 import adaIN.model as adaINmodel
 import adaIN.utils as utils
 from run_exp import device as nst_device
+from experiments.utils import plot_images
 
 encoder_rel_path = 'adaIN/vgg_normalised.pth'
 decoder_rel_path = 'adaIN/decoder.pth'
@@ -94,7 +95,7 @@ class NSTTransform(transforms.Transform):
 
         if (H, W) != (224, 224):
             x = self.upsample(x)
-
+        
         idy = torch.randperm(self.num_styles)[0:ratio]
         idx = torch.randperm(x.size(0))[0:ratio]
 
@@ -104,7 +105,7 @@ class NSTTransform(transforms.Transform):
 
         if (H, W) != (224, 224):
             stl_imgs = nn.Upsample(size=(H, W), mode='bilinear', align_corners=False)(stl_imgs)
-
+        
         #stl_imgs = self.norm_style_tensor(stl_imgs)
 
         if single_image:

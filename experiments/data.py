@@ -14,6 +14,7 @@ from torch.utils.data import Subset, Dataset, ConcatDataset, RandomSampler, Batc
 import numpy as np
 import experiments.custom_transforms as custom_transforms
 from run_exp import device
+from experiments.utils import plot_images
 
 def normalization_values(batch, dataset, normalized, manifold=False, manifold_factor=1):
 
@@ -110,10 +111,9 @@ class StylizedTensorDataset(Dataset):
         """
         self.dataset = dataset
         self.stylized_images = stylized_images
-        self.stylized_indices = set(stylized_indices)  # Convert to set for O(1) lookup
 
-        # Map original dataset indices to the stylized dataset
-        self.index_map = {orig_idx: i for i, orig_idx in enumerate(stylized_indices)}
+        # Map original dataset indices to the stylized dataset ensures efficient O(1) lookup
+        self.index_map = {orig_idx.item(): i for i, orig_idx in enumerate(stylized_indices)} 
 
     def __len__(self):
         return len(self.dataset)
@@ -123,7 +123,7 @@ class StylizedTensorDataset(Dataset):
         return x
 
     def __getitem__(self, idx):
-        if idx in self.stylized_indices:
+        if idx in self.index_map:
             # Fetch data from the stylized dataset
             stylized_idx = self.index_map[idx]
             x = self.stylized_images[stylized_idx]
@@ -380,7 +380,6 @@ class AugmentedDataset(torch.utils.data.Dataset):
         self.stylized_original_dataset = stylized_original_dataset
         self.stylized_generated_dataset = stylized_generated_dataset
         self.style_mask = style_mask
-        assert len(style_mask) == len(stylized_original_dataset) + len(stylized_generated_dataset)
         self.transforms_basic = transforms_basic
         self.transforms_orig_after_style = transforms_orig_after_style
         self.transforms_gen_after_style = transforms_gen_after_style
@@ -391,6 +390,8 @@ class AugmentedDataset(torch.utils.data.Dataset):
         self.num_original = len(stylized_original_dataset) if stylized_original_dataset else 0
         self.num_generated = len(stylized_generated_dataset) if stylized_generated_dataset else 0
         self.total_size = self.num_original + self.num_generated
+
+        assert len(style_mask) == self.num_original + self.num_generated
 
     def __getitem__(self, idx):
 
