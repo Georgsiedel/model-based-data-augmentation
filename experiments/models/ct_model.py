@@ -20,7 +20,7 @@ class CtModel(nn.Module):
             manifold=False,
             manifold_factor=1,
         )
-        self.internal_adain = kwargs.get("internal_adain_prob", None)
+        self.internal_adain_prob = kwargs.get("internal_adain_prob", None)
         if normalized:
             self.register_buffer("mu", self.mean)
             self.register_buffer("sigma", self.std)
@@ -114,8 +114,8 @@ class CtModel(nn.Module):
                     sparse_level=0.65,
                     l0_level=0.0,
                 )
-            if internal_adain_probability := self.internal_adain:
-                if prob < internal_adain_probability and i == 0:
+            if self.internal_adain_prob is not None:
+                if prob < self.internal_adain_prob and i == 0:
                     out = self.internal_adain(out, style_feats)
                     print("[TEST] Internal AdaIN applied")
         return out, targets
