@@ -12,7 +12,7 @@
 		}
 	},
 	"runArgs": [
-		"--gpus=device=0"
+		"--gpus=device=2"
 	],
 	"postCreateCommand": "pip3 install --user -r requirements.txt",
 	"containerEnv": {

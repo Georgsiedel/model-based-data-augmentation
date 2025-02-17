@@ -78,8 +78,8 @@ class WideResNet(ct_model.CtModel):
     activation_function: object
 
     def __init__(self, depth, widen_factor, dataset, normalized, dropout_rate=0.0, num_classes=10,
-                 factor=1, block=WideBasic, activation_function='relu'):
-        super(WideResNet, self).__init__(dataset=dataset, normalized=normalized, num_classes=num_classes)
+                 factor=1, block=WideBasic, activation_function='relu', **kwargs):
+        super(WideResNet, self).__init__(dataset=dataset, normalized=normalized, num_classes=num_classes, **kwargs)
         self.in_planes = 16
         self.activation_function = getattr(F, activation_function)
 
@@ -110,13 +110,13 @@ class WideResNet(ct_model.CtModel):
     def forward(self, x, targets=None, robust_samples=0, corruptions=None, mixup_alpha=0.0, mixup_p=0.0, manifold=False,
                 manifold_noise_factor=1, cutmix_alpha=0.0, cutmix_p=0.0, noise_minibatchsize=1,
                 concurrent_combinations=1, noise_sparsity=0.0, noise_patch_lower_scale = 1.0,
-                noise_patch_upper_scale=1.0, generated_ratio=0.0):
+                noise_patch_upper_scale=1.0, generated_ratio=0.0, style_feats=None):
 
         out = super(WideResNet, self).forward_normalize(x)
         out, mixed_targets = super(WideResNet, self).forward_noise_mixup(out, targets, robust_samples, corruptions,
                                         mixup_alpha, mixup_p, manifold, manifold_noise_factor, cutmix_alpha, cutmix_p,
                                         noise_minibatchsize, concurrent_combinations, noise_sparsity,
-                                        noise_patch_lower_scale, noise_patch_upper_scale, generated_ratio)
+                                        noise_patch_lower_scale, noise_patch_upper_scale, generated_ratio, style_feats=None)
         out = self.activation_function(self.bn1(out))
         out = F.avg_pool2d(out, 8)
         out = out.view(out.size(0), -1)

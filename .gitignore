@@ -13,3 +13,5 @@ organizational/
 experiments/adaIN/style_feats_adain_1000.npy
 .venv/
 experiments/adaIN/__pycache__/
+.python-version
+test_temp.ipynb

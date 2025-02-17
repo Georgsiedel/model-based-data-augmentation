@@ -1,7 +1,7 @@
 import os
 import torch
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == '__main__':
     import importlib
@@ -16,7 +16,7 @@ if __name__ == '__main__':
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
         runs = 1
         
-        if experiment in [12]:
+        if experiment in [87]:
             resume = True
         else:
             resume = False
@@ -72,15 +72,14 @@ if __name__ == '__main__':
 
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
-        if experiment in [11]:
-            print('Beginning metric evaluation')
-            cmdeval = "python experiments/eval.py --resume={} --experiment={} --runs={} --batchsize={} --dataset={} " \
-                    "--modeltype={} --modelparams=\"{}\" --resize={} --combine_test_corruptions={} --number_workers={} " \
-                    "--normalize={} --pixel_factor={} --test_on_c={} --calculate_adv_distance={} --adv_distance_params=\"{}\" " \
-                    "--calculate_autoattack_robustness={} --autoattack_params=\"{}\" --combine_train_corruptions={} " \
-                    .format(resume, experiment, runs, 1000, config.dataset, config.modeltype, config.modelparams,
-                            config.resize, config.combine_test_corruptions, 0, config.normalize,
-                            config.pixel_factor, config.test_on_c, config.calculate_adv_distance, config.adv_distance_params,
-                            config.calculate_autoattack_robustness, config.autoattack_params, config.combine_train_corruptions)
-            os.system(cmdeval)
+        print('Beginning metric evaluation')
+        cmdeval = "python experiments/eval.py --resume={} --experiment={} --runs={} --batchsize={} --dataset={} " \
+                "--modeltype={} --modelparams=\"{}\" --resize={} --combine_test_corruptions={} --number_workers={} " \
+                "--normalize={} --pixel_factor={} --test_on_c={} --calculate_adv_distance={} --adv_distance_params=\"{}\" " \
+                "--calculate_autoattack_robustness={} --autoattack_params=\"{}\" --combine_train_corruptions={} " \
+                .format(resume, experiment, runs, 1000, config.dataset, config.modeltype, config.modelparams,
+                        config.resize, config.combine_test_corruptions, 0, config.normalize,
+                        config.pixel_factor, config.test_on_c, config.calculate_adv_distance, config.adv_distance_params,
+                        config.calculate_autoattack_robustness, config.autoattack_params, config.combine_train_corruptions)
+        os.system(cmdeval)
 
