@@ -387,7 +387,7 @@ def train_epoch(pbar):
                 args.noise_patch_scale["lower"],
                 args.noise_patch_scale["upper"],
                 Dataloader.generated_ratio,
-                style_feats = style_feats if style_dataloader else None,
+                style_feats=style_feats if style_dataloader else None,
             )
             criterion.update(model, optimizer)
             loss = criterion(outputs, mixed_targets, inputs, targets)

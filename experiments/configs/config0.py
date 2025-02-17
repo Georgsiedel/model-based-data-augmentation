@@ -431,6 +431,8 @@ adv_distance_params = {
 calculate_autoattack_robustness = False
 autoattack_params = {"setsize": 1000, "epsilon": 8 / 255, "norm": "Linf"}
 
+style_dir = "/kaggle/input/painter-by-numbers-resized"
+
 if dataset == "CIFAR10":
     num_classes = 10
     pixel_factor = 1
