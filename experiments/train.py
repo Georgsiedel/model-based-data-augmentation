@@ -338,7 +338,14 @@ parser.add_argument(
 parser.add_argument(
     "--kaggle", type=bool, default=False, help="Whether to run on Kaggle or locally"
 )
-# parser.add_argument('--internal_adain_prob', default=0.0, type=float, help='probability of applying internal AdaIN')
+
+parser.add_argument("--style_dir", default=None, type=str, help="path to style images")
+parser.add_argument(
+    "--internal_adain_prob",
+    default=0.0,
+    type=float,
+    help="probability of applying internal AdaIN",
+)
 
 args = parser.parse_args()
 configname = f"experiments.configs.config{args.experiment}"

@@ -8,7 +8,7 @@ import torch
 
 
 class CtModel(nn.Module):
-    def __init__(self, dataset, normalized, num_classes, internal_adain_prob=None):
+    def __init__(self, dataset, normalized, num_classes, **kwargs):
         super(CtModel, self).__init__()
         self.normalized = normalized
         self.num_classes = num_classes
@@ -20,7 +20,7 @@ class CtModel(nn.Module):
             manifold=False,
             manifold_factor=1,
         )
-        self.internal_adain = internal_adain_prob
+        self.internal_adain = kwargs.get("internal_adain_prob", None)
         if normalized:
             self.register_buffer("mu", self.mean)
             self.register_buffer("sigma", self.std)
@@ -114,7 +114,7 @@ class CtModel(nn.Module):
                     sparse_level=0.65,
                     l0_level=0.0,
                 )
-            if internal_adain_probability := self.internal_adain_prob:
+            if internal_adain_probability := self.internal_adain:
                 if prob < internal_adain_probability and i == 0:
                     out = self.internal_adain(out, style_feats)
                     print("[TEST] Internal AdaIN applied")
