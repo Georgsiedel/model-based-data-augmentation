@@ -586,7 +586,7 @@ class DataLoading:
 
     def load_style_dataloader(self, style_dir, batch_size):
         t = transforms.ToTensor()
-        style_transforms = transforms.Compose([self.transforms_preprocess, t])
+        style_transforms = transforms.Compose([self.transforms_basic, t])
         style_dataset = StyleDataset(style_dir, transform=style_transforms)
         style_loader = DataLoader(style_dataset, batch_size=batch_size, shuffle=False)
         return style_loader
