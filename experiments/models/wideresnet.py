@@ -201,7 +201,7 @@ class WideResNet(ct_model.CtModel):
             noise_patch_lower_scale,
             noise_patch_upper_scale,
             generated_ratio,
-            style_feats=None,
+            style_feats,
         )
         out = self.activation_function(self.bn1(out))
         out = F.avg_pool2d(out, 8)
