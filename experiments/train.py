@@ -368,6 +368,7 @@ def train_epoch(pbar):
         if style_iter:
             try:
                 style_feats = next(style_iter)
+                print("[TEMP TEST] Style Dataloader is used")
             except StopIteration:
                 style_iter = iter(style_dataloader)
                 style_feats = next(style_iter)
