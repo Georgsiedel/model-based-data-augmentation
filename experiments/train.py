@@ -362,6 +362,7 @@ def train_epoch(pbar):
 
     if style_dataloader:
         style_iter = iter(style_dataloader)
+        print("[TEMP TEST] Style Dataloader is initiated")
 
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         if style_iter:
@@ -370,6 +371,8 @@ def train_epoch(pbar):
             except StopIteration:
                 style_iter = iter(style_dataloader)
                 style_feats = next(style_iter)
+        else:
+            style_feats = None
 
         optimizer.zero_grad()
         if criterion.robust_samples >= 1:
@@ -394,7 +397,7 @@ def train_epoch(pbar):
                 args.noise_patch_scale["lower"],
                 args.noise_patch_scale["upper"],
                 Dataloader.generated_ratio,
-                style_feats=style_feats if style_dataloader else None,
+                style_feats=style_feats,
             )
             criterion.update(model, optimizer)
             loss = criterion(outputs, mixed_targets, inputs, targets)
