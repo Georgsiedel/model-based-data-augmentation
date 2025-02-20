@@ -92,12 +92,12 @@ class CtModel(nn.Module):
             f"[TEST] Style feat type: {type(style_feats)} and out type: {type(out)} and shape of style feats {style_feats.shape}, shape of content {out.shape}"
         )
         out = self.blocks[0](out)
-        if style_feats:
+        if style_feats is not None:
             style_feats = self.blocks[0](style_feats)
         prob = torch.rand(1).item()
         for i, ResidualBlock in enumerate(self.blocks[1:]):
             out = ResidualBlock(out)
-            if style_feats:
+            if style_feats is not None:
                 style_feats = ResidualBlock(style_feats)
             if k == (i + 1):  # Do manifold mixup if k is greater 0
                 out, targets = mixup_process(
