@@ -7,7 +7,7 @@ torch.cuda.device_count()
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [217,188,222,226,230]:
+    for experiment in [310,311,312,313,316,317,318]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -16,9 +16,12 @@ if __name__ == '__main__':
 
         runs = 1
         run_iter = [0] 
+        if experiment in [250]:
+            runs = 2
+            run_iter =[1]
 
         for run in run_iter:
-            if experiment == 217 and run in [0]:
+            if experiment == 250 and run in [1]:
                 resume = True
             else:
                 resume = False
