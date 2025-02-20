@@ -114,7 +114,9 @@ class CtModel(nn.Module):
                     sparse_level=0.65,
                     l0_level=0.0,
                 )
-                print(f"[TEST] Style feat type: {type(style_feats)}")
+                print(
+                    f"[TEST] Style feat type: {type(style_feats)} and shape of style feats {style_feats.shape}, shape of content {out.shape}"
+                )
             if self.internal_adain_prob is not None:
                 if prob < self.internal_adain_prob and i == 0:
                     out = self.internal_adain(out, style_feats)
