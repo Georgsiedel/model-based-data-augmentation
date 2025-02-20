@@ -88,6 +88,9 @@ class CtModel(nn.Module):
             out = noisy_out
             # plot_images(4, self.mean, self.std, noisy_out, noisy_out)
 
+        print(
+            f"[TEST] Style feat type: {type(style_feats)} and out type: {type(out)} and shape of style feats {style_feats.shape}, shape of content {out.shape}"
+        )
         out = self.blocks[0](out)
         prob = torch.rand(1).item()
         for i, ResidualBlock in enumerate(self.blocks[1:]):
