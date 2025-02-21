@@ -368,10 +368,12 @@ def train_epoch(pbar):
         if style_iter:
             try:
                 style_feats = next(style_iter)
+                style_feats = style_feats.to(device, dtype=torch.float32)
                 print("[TEMP TEST] Style Dataloader is used")
             except StopIteration:
                 style_iter = iter(style_dataloader)
                 style_feats = next(style_iter)
+                style_feats = style_feats.to(device, dtype=torch.float32)
         else:
             style_feats = None
 
