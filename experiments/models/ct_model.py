@@ -88,9 +88,6 @@ class CtModel(nn.Module):
             out = noisy_out
             # plot_images(4, self.mean, self.std, noisy_out, noisy_out)
 
-        print(
-            f"[TEST] Style feat type: {type(style_feats)} and out type: {type(out)} and shape of style feats {style_feats.shape}, shape of content {out.shape}"
-        )
         out = self.blocks[0](out)
         if style_feats is not None:
             style_feats = self.blocks[0](style_feats)
@@ -126,9 +123,6 @@ class CtModel(nn.Module):
                 if prob < self.internal_adain_prob and i == 0:
                     # style_feats = self.blocks[0](style_feats)
                     # style_feats = self.blocks[1](style_feats)
-                    print(
-                        f"[TEST] Style feat type: {type(style_feats)} and shape of style feats {style_feats.shape}, shape of content {out.shape}"
-                    )
                     out = self.internal_adain(out, style_feats)
                     print("[TEST] Internal AdaIN applied")
         return out, targets

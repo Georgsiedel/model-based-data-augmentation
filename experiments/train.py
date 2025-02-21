@@ -362,14 +362,12 @@ def train_epoch(pbar):
 
     if style_dataloader:
         style_iter = iter(style_dataloader)
-        print("[TEMP TEST] Style Dataloader is initiated")
 
     for batch_idx, (inputs, targets) in enumerate(trainloader):
-        if style_iter:
+        if style_dataloader:
             try:
                 style_feats = next(style_iter)
                 style_feats = style_feats.to(device, dtype=torch.float32)
-                print("[TEMP TEST] Style Dataloader is used")
             except StopIteration:
                 style_iter = iter(style_dataloader)
                 style_feats = next(style_iter)
