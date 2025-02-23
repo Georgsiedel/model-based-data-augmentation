@@ -104,8 +104,8 @@ cutmix = {
 }  # default alpha 1.0 #If both mixup and cutmix are >0, mixup or cutmix are selected by 0.5 chance
 manifold = {"apply": True, "noise_factor": 3}
 # TODO: Seperate params for internal_adain
-internal_adain = {
-    "type": "int_adain", # int_adain, pono
+int_adain_params = {
+    "type": "int_adain",  # int_adain, pono
     "probability": 0.5,
     "style_dir": "/kaggle/input/painter-by-numbers-resized",
 }

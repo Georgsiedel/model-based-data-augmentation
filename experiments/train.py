@@ -340,12 +340,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--internal_adain_prob",
-    default=0.0,
-    type=float,
-    help="probability of applying internal AdaIN",
-)
-parser.add_argument(
     "--int_adain_params",
     default={},
     type=str,
