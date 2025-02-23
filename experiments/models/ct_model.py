@@ -20,7 +20,6 @@ class CtModel(nn.Module):
             manifold=False,
             manifold_factor=1,
         )
-        self.internal_adain_prob = kwargs.get("internal_adain_prob", None)
         if normalized:
             self.register_buffer("mu", self.mean)
             self.register_buffer("sigma", self.std)
@@ -49,7 +48,11 @@ class CtModel(nn.Module):
         noise_patch_upper_scale,
         generated_ratio,
         style_feats,
+        **kwargs,
     ):
+        if style_norm_type := kwargs.get("type", None):
+            int_adain_probability = kwargs.get("probability", 0.0)
+
         # define where mixup is applied. k=0 is in the input space, k>0 is in the embedding space (manifold mixup)
         if self.training == False:
             k = -1
@@ -94,8 +97,11 @@ class CtModel(nn.Module):
         prob = torch.rand(1).item()
         for i, ResidualBlock in enumerate(self.blocks[1:]):
             out = ResidualBlock(out)
-            if style_feats is not None:
-                style_feats = ResidualBlock(style_feats)
+            if style_norm_type == "pono":
+                if prob < int_adain_probability and i == 0:
+                    out = self.internal_adain(out, style_feats)
+                    print("[TEST] PoNo Applied")
+
             if k == (i + 1):  # Do manifold mixup if k is greater 0
                 out, targets = mixup_process(
                     out,
@@ -119,10 +125,10 @@ class CtModel(nn.Module):
                     l0_level=0.0,
                 )
 
-            if self.internal_adain_prob is not None:
-                if prob < self.internal_adain_prob and i == 0:
+            if style_norm_type == "int_adain":
+                if prob < int_adain_probability and i == 0:
                     # style_feats = self.blocks[0](style_feats)
-                    # style_feats = self.blocks[1](style_feats)
+                    style_feats = ResidualBlock(style_feats)
                     out = self.internal_adain(out, style_feats)
                     print("[TEST] Internal AdaIN applied")
         return out, targets

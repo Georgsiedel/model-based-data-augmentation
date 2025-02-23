@@ -182,6 +182,7 @@ class WideResNet(ct_model.CtModel):
         noise_patch_upper_scale=1.0,
         generated_ratio=0.0,
         style_feats=None,
+        **kwargs,
     ):
         out = super(WideResNet, self).forward_normalize(x)
         out, mixed_targets = super(WideResNet, self).forward_noise_mixup(
@@ -202,6 +203,7 @@ class WideResNet(ct_model.CtModel):
             noise_patch_upper_scale,
             generated_ratio,
             style_feats,
+            **kwargs
         )
         out = self.activation_function(self.bn1(out))
         out = F.avg_pool2d(out, 8)

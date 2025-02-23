@@ -339,14 +339,20 @@ parser.add_argument(
     "--kaggle", type=bool, default=False, help="Whether to run on Kaggle or locally"
 )
 
-parser.add_argument("--style_dir", default=None, type=str, help="path to style images")
 parser.add_argument(
     "--internal_adain_prob",
     default=0.0,
     type=float,
     help="probability of applying internal AdaIN",
 )
-
+parser.add_argument(
+    "--int_adain_params",
+    default={},
+    type=str,
+    action=utils.str2dictAction,
+    metavar="KEY=VALUE",
+    help="parameters for the chosen model",
+)
 args = parser.parse_args()
 configname = f"experiments.configs.config{args.experiment}"
 config = importlib.import_module(configname)
@@ -405,6 +411,7 @@ def train_epoch(pbar):
                 args.noise_patch_scale["upper"],
                 Dataloader.generated_ratio,
                 style_feats=style_feats,
+                **args.int_adain_params,
             )
             criterion.update(model, optimizer)
             loss = criterion(outputs, mixed_targets, inputs, targets)
@@ -647,11 +654,9 @@ if __name__ == "__main__":
         args.batchsize, args.number_workers
     )
 
-    if (
-        "internal_adain_prob" in args.modelparams
-    ):  # internal AdaIN should be provided in modelparams as probability
+    if style_dir := args.int_adain_params.get("style_dir", None):
         style_dataloader = Dataloader.load_style_dataloader(
-            style_dir=args.style_dir, batch_size=args.batchsize
+            style_dir=style_dir, batch_size=args.batchsize
         )
 
     # Calculate steps and epochs

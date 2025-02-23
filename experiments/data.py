@@ -369,7 +369,7 @@ class BalancedRatioSampler(Sampler):
 
 
 class StyleDataset(Dataset):
-    def __init__(self, root_dir, transform=None):
+    def __init__(self, root_dir, dataset_type, transform=None):
         """
         Args:
             root_dir (string): Directory with all the images.
@@ -382,6 +382,14 @@ class StyleDataset(Dataset):
             for file in os.listdir(root_dir)
             if file.endswith(".jpg")
         ]
+        if dataset_type in ["CIFAR10", "CIFAR100"]:
+            self.transform = transforms.Resize(32, antialias=True)
+        elif dataset_type == "TinyImageNet":
+            self.transform = transforms.Resize(64, antialias=True)
+        elif dataset_type == "ImageNet":
+            self.transform = transforms.Resize(224, antialias=True)
+        else:
+            raise AttributeError(f"Dataset: {dataset_type} is an unrecognized dataset")
 
     def __len__(self):
         return len(self.image_paths)
@@ -585,9 +593,7 @@ class DataLoading:
         )
 
     def load_style_dataloader(self, style_dir, batch_size):
-        t = transforms.ToTensor()
-        style_transforms = transforms.Compose([self.transforms_basic, t])
-        style_dataset = StyleDataset(style_dir, transform=style_transforms)
+        style_dataset = StyleDataset(style_dir, dataset_type=self.dataset)
         style_loader = DataLoader(style_dataset, batch_size=batch_size, shuffle=False)
         return style_loader
 

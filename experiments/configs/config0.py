@@ -103,6 +103,12 @@ cutmix = {
     "p": 0.0,
 }  # default alpha 1.0 #If both mixup and cutmix are >0, mixup or cutmix are selected by 0.5 chance
 manifold = {"apply": True, "noise_factor": 3}
+# TODO: Seperate params for internal_adain
+internal_adain = {
+    "type": "int_adain", # int_adain, pono
+    "probability": 0.5,
+    "style_dir": "/kaggle/input/painter-by-numbers-resized",
+}
 RandomEraseProbability = 0.3
 swa = {"apply": True, "start_factor": 0.85, "lr_factor": 0.2}
 
@@ -431,7 +437,6 @@ adv_distance_params = {
 calculate_autoattack_robustness = False
 autoattack_params = {"setsize": 1000, "epsilon": 8 / 255, "norm": "Linf"}
 
-style_dir = "/kaggle/input/painter-by-numbers-resized"
 
 if dataset == "CIFAR10":
     num_classes = 10
