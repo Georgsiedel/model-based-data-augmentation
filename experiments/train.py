@@ -364,6 +364,11 @@ def train_epoch(pbar):
         style_iter = iter(style_dataloader)
 
     for batch_idx, (inputs, targets) in enumerate(trainloader):
+        optimizer.zero_grad()
+        if criterion.robust_samples >= 1:
+            inputs = torch.cat(inputs, 0)
+
+        inputs, targets = inputs.to(device, dtype=torch.float32), targets.to(device)
         if style_dataloader:
             try:
                 style_feats = next(style_iter)
@@ -372,14 +377,15 @@ def train_epoch(pbar):
                 style_iter = iter(style_dataloader)
                 style_feats = next(style_iter)
                 style_feats = style_feats.to(device, dtype=torch.float32)
+
+            content_batch_size = inputs.size(0)
+            style_batch_size = style_feats.size(0)
+
+            if content_batch_size != style_batch_size:
+                style_feats = style_feats[:content_batch_size]
+
         else:
             style_feats = None
-
-        optimizer.zero_grad()
-        if criterion.robust_samples >= 1:
-            inputs = torch.cat(inputs, 0)
-
-        inputs, targets = inputs.to(device, dtype=torch.float32), targets.to(device)
         with torch.amp.autocast(device_type=device):
             outputs, mixed_targets = model(
                 inputs,
