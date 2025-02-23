@@ -650,9 +650,12 @@ if __name__ == "__main__":
     if (
         "internal_adain_prob" in args.modelparams
     ):  # internal AdaIN should be provided in modelparams as probability
-        style_dataloader = Dataloader.load_style_dataloader(
-            style_dir=args.style_dir, batch_size=args.batchsize
-        )
+        if style_dir := args.style_dir:
+            style_dataloader = Dataloader.load_style_dataloader(
+                style_dir=style_dir, batch_size=args.batchsize
+            )
+        else:
+            raise ValueError("--style_dir required with internal_adain_prob")
 
     # Calculate steps and epochs
     total_steps, start_steps = utils.calculate_steps(
