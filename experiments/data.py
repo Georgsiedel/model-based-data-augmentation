@@ -383,11 +383,11 @@ class StyleDataset(Dataset):
             if file.endswith(".jpg")
         ]
         if dataset_type in ["CIFAR10", "CIFAR100"]:
-            self.transform = transforms.Resize(32, antialias=True)
+            self.transform = transforms.Resize((32, 32), antialias=True)
         elif dataset_type == "TinyImageNet":
-            self.transform = transforms.Resize(64, antialias=True)
+            self.transform = transforms.Resize((64, 64), antialias=True)
         elif dataset_type == "ImageNet":
-            self.transform = transforms.Resize(224, antialias=True)
+            self.transform = transforms.Resize((224, 224), antialias=True)
         else:
             raise AttributeError(f"Dataset: {dataset_type} is an unrecognized dataset")
         self.transform = transforms.Compose([self.transform, transforms.ToTensor()])
