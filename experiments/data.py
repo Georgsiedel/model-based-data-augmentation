@@ -390,6 +390,7 @@ class StyleDataset(Dataset):
             self.transform = transforms.Resize(224, antialias=True)
         else:
             raise AttributeError(f"Dataset: {dataset_type} is an unrecognized dataset")
+        self.transform = transforms.Compose([self.transform, transforms.ToTensor()])
 
     def __len__(self):
         return len(self.image_paths)
