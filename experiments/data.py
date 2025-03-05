@@ -159,9 +159,6 @@ class CustomDataset(Dataset):
         self.np_images = np.memmap(np_images, dtype=np.float32, mode='r') if isinstance(np_images, str) else np_images
         self.resize = resize
         self.preprocessing = preprocessing
-        #self.images = torch.from_numpy(np_images).permute(0, 3, 1, 2) / 255
-        #if resize == True:
-        #    self.images = transforms.Resize(224, antialias=True)(self.images)
 
         # Extract labels from the original PyTorch dataset
         self.labels = [label for _, label in original_dataset]
@@ -179,53 +176,47 @@ class CustomDataset(Dataset):
 
         return image, label
 
-class GroupedBalancedRatioSampler(Sampler):
-    def __init__(self, dataset, generated_ratio, batch_size, group_size=32):
-        super(BalancedRatioSampler, self).__init__()
+class ReproducibleBalancedRatioSampler(Sampler):
+    def __init__(self, dataset, generated_ratio, batch_size, epoch):
+        super(ReproducibleBalancedRatioSampler, self).__init__()
         self.dataset = dataset
         self.batch_size = batch_size
-        self.group_size = group_size
         self.generated_ratio = generated_ratio
         self.size = len(dataset)
+        self.current_epoch = epoch
 
         self.num_generated = int(self.size * self.generated_ratio)
         self.num_original = self.size - self.num_generated
         self.num_generated_batch = int(self.batch_size * self.generated_ratio)
         self.num_original_batch = self.batch_size - self.num_generated_batch
 
-    def _create_groups(self, num_items, offset=0):
-        """Create reproducible groups by dividing the range into intervals."""
-        indices = torch.arange(offset, offset + num_items)  # Reproducible intervals
-        groups = [indices[i:min(i + self.group_size, len(indices))] for i in range(0, len(indices), self.group_size)]
-        return groups
+    def generate_indices_order(self, num_samples, epoch):
+        # Use a local RNG instance that won’t disturb your global seeds.
+        local_rng = random.Random(epoch)
+        indices = list(range(num_samples))
+        local_rng.shuffle(indices)
+        return indices
 
     def __iter__(self):
 
-        # Create groups for original and generated indices
-        # generated permutation requires generated images appended after original images!
-        original_groups = self._create_groups(self.num_original)
-        generated_groups = self._create_groups(self.num_generated, offset=self.num_original)
-        
-        # Shuffle groups
-        random.shuffle(original_groups)
-        random.shuffle(generated_groups)
-
-        # Ungroup indices by concatenating the groups into a single tensor
-        original_grouped_perm = torch.cat(original_groups)
-        generated_grouped_perm = torch.cat(generated_groups)
+        # Create a single permutation for the whole epoch which is reproducible.
+        # generated permutation requires generated images appended to the back of the dataset!
+        original_perm = self.generate_indices_order(self.num_original, epoch=self.current_epoch)
+        generated_perm = self.generate_indices_order(self.num_generated, epoch=self.current_epoch)
+        self.current_epoch += 1
 
         batch_starts = range(0, self.size, self.batch_size)  # Start points for each batch
-        for i, _ in enumerate(batch_starts):
+        for i, start in enumerate(batch_starts):
 
             # Slicing the permutation to get batch indices, avoiding going out of bound
-            original_indices = original_grouped_perm[min(i * self.num_original_batch, self.num_original) : min((i+1) * self.num_original_batch, self.num_original)]
-            generated_indices = generated_grouped_perm[min(i * self.num_generated_batch, self.num_generated) : min((i+1) * self.num_generated_batch, self.num_generated)]
+            original_indices = original_perm[min(i * self.num_original_batch, self.num_original) : min((i+1) * self.num_original_batch, self.num_original)]
+            generated_indices = generated_perm[min(i * self.num_generated_batch, self.num_generated) : min((i+1) * self.num_generated_batch, self.num_generated)]
 
             # Combine
-            batch_indices = torch.cat((original_indices, generated_indices))
+            batch_indices = original_indices + generated_indices
             #batch_indices = batch_indices[torch.randperm(batch_indices.size(0))]
 
-            yield batch_indices.tolist()
+            yield batch_indices
 
     def __len__(self):
         return (self.size + self.batch_size - 1) // self.batch_size
@@ -233,109 +224,131 @@ class GroupedBalancedRatioSampler(Sampler):
 class GroupedAugmentedDataset(torch.utils.data.Dataset):
     """Dataset wrapper to perform augmentations and allow robust loss functions."""
 
-    def __init__(self, original_dataset, stylized_original_dataset, generated_dataset, stylized_generated_dataset, style_mask_orig, 
-                 style_mask_gen, transforms_preprocess, transforms_basic, transforms_batch_gen, transforms_batch_orig, 
-                 transforms_iter_orig, transforms_iter_gen, robust_samples=0, group_size=32):
+    def __init__(self, original_dataset, generated_dataset, 
+                 transforms_basic, transforms_batch_gen, transforms_batch_orig, transforms_iter_orig_after_style, transforms_iter_gen_after_style,
+                 transforms_iter_orig_after_nostyle, transforms_iter_gen_after_nostyle, robust_samples=0, epoch=0):
+        
         self.original_dataset = original_dataset
-        self.stylized_original_dataset = stylized_original_dataset
         self.generated_dataset = generated_dataset
-        self.stylized_generated_dataset = stylized_generated_dataset
-        self.style_mask_orig = style_mask_orig
-        self.style_mask_gen = style_mask_gen
-        self.preprocess = transforms_preprocess
         self.transforms_basic = transforms_basic
         self.transforms_batch_gen = transforms_batch_gen
         self.transforms_batch_orig = transforms_batch_orig
-        self.transforms_iter_orig = transforms_iter_orig
-        self.transforms_iter_gen = transforms_iter_gen
+        self.transforms_iter_orig_after_style = transforms_iter_orig_after_style
+        self.transforms_iter_gen_after_style = transforms_iter_gen_after_style
+        self.transforms_iter_orig_after_nostyle = transforms_iter_orig_after_nostyle
+        self.transforms_iter_gen_after_nostyle = transforms_iter_gen_after_nostyle
+
         self.robust_samples = robust_samples
-        self.group_size = group_size
+
+        # Compute cache sizes (i.e. block sizes) based on the batch transform parameters.
+        if transforms_batch_gen:
+            self.cache_size_gen = int(transforms_batch_gen.batch_size / transforms_batch_gen.stylized_ratio)
+        else:
+            self.cache_size_gen = 1
+        if transforms_batch_orig:
+            self.cache_size_orig = int(transforms_batch_orig.batch_size / transforms_batch_orig.stylized_ratio)
+        else:
+            self.cache_size_orig = 1
 
         self.num_original = len(original_dataset) if original_dataset else 0
-        self.num_generated = len(generated_dataset['labels']) if generated_dataset else 0
+        self.num_generated = len(generated_dataset) if generated_dataset else 0
         self.total_size = self.num_original + self.num_generated
 
-        # Create groups for original and generated indices like in the Batch Sampler
-        self.original_groups = self._create_groups(self.num_original)
-        self.generated_groups = self._create_groups(self.num_generated, offset=self.num_original)
+        # Initialize empty caches. They map the global (domain) index to (image, label, style_flag).
+        self.cache_orig = {}
+        self.cache_gen = {}
 
-        # Initialize cached dataset
-        self.cached_dataset = [None] * self.total_size
-        if robust_samples == 2:
-            self.cached_dataset_2 = [None] * self.total_size
+        # Generate reproducible permutation lists for each domain.
+        self.set_epoch(epoch)
 
-    def _create_groups(self, num_items, offset=0):
-        """Create reproducible groups by dividing the range into intervals."""
-        indices = torch.arange(offset, offset + num_items)  # Reproducible intervals
-        groups = [indices[i:min(i + self.group_size, len(indices))] for i in range(0, len(indices), self.group_size)]
-        return groups
+    def set_epoch(self, epoch):
+        """
+        At the beginning of each epoch, regenerate the random ordering for each domain and clear caches.
+        """
+        self.original_perm = self.generate_indices_order(self.num_original, epoch)
+        self.generated_perm = self.generate_indices_order(self.num_generated, epoch)
+        self.cache_orig.clear()
+        self.cache_gen.clear()
+        
+    def generate_indices_order(self, num_samples, epoch):
+        # Use a local RNG instance that won’t disturb your global seeds.
+        local_rng = random.Random(epoch)
+        indices = list(range(num_samples))
+        local_rng.shuffle(indices)
+        return indices
     
-    def _process_batch(self, group_indices, is_generated):
-        """Process a batch of images and return processed images and labels."""
-        if is_generated:
-            # Load images and labels from the generated dataset
-            images = [self.preprocess(Image.fromarray(self.generated_dataset['images'][idx - self.num_original])) for idx in group_indices]
-            labels = [self.generated_dataset['labels'][idx - self.num_original] for idx in group_indices]
-            images = torch.stack(images)
-            images = self.transforms_batch_gen(images)
-        else:
-            # Load images and labels from the original dataset
-            images, labels = zip(*[self.original_dataset[idx] for idx in group_indices])
-            images = torch.stack([self.preprocess(img) for img in images])
-            images = self.transforms_batch_orig(images)
-
-        return images, labels
-
     def __getitem__(self, idx):
-
+        """
+        Retrieve the (transformed) item corresponding to a global index.
+        
+        For original images, the global index is used as is; for generated images,
+        the index is adjusted by subtracting num_original. If the requested item is not
+        in the cache, the cache is cleared and filled by processing a block (of size cache_size)
+        from the corresponding permutation starting at the requested index’s position.
+        Then, an iterative transform (after the batch transform) is applied based on the style flag.
+        """
+        # Determine domain.
         if idx < self.num_original:
-            x, y = self.stylized_original_dataset[idx]
-            is_generated = False
+            global_index = idx  # for original images
+            perm = self.original_perm
+            cache = self.cache_orig
+            cache_size = self.cache_size_orig
+            dataset = self.original_dataset
+            transform_batch = self.transforms_batch_orig
+            transforms_iter_after_style = self.transforms_iter_orig_after_style
+            transforms_iter_after_nostyle = self.transforms_iter_orig_after_nostyle
         else:
-            x = Image.fromarray(self.stylized_generated_dataset['images'][idx - self.num_original])
-            y = self.stylized_generated_dataset['labels'][idx - self.num_original]
-            is_generated = True
+            global_index = idx - self.num_original  # for generated images, adjust index
+            perm = self.generated_perm
+            cache = self.cache_gen
+            cache_size = self.cache_size_gen
+            dataset = self.generated_dataset
+            transform_batch = self.transforms_batch_gen
+            transforms_iter_after_style = self.transforms_iter_gen_after_style
+            transforms_iter_after_nostyle = self.transforms_iter_gen_after_nostyle
 
-        if self.cached_dataset[idx] is None:
+        # If the requested global index is cached, retrieve it.
+        if global_index not in cache:
 
-            # Determine group and dataset
-            group_list = self.generated_groups if is_generated else self.original_groups
-            # Find the group containing the index
-            group_idx = next(i for i, group in enumerate(group_list) if idx in group)
-            group_indices = group_list[group_idx]
+            # Not in cache. Find the position of this global index in the permutation.
+            try:
+                pos = perm.index(global_index)
+            except ValueError:
+                pos = 0
+            # Get the block of indices: from the found position up to cache_size items.
+            indices_block = perm[pos: pos + cache_size]
 
-            # Process the batch
-            images, labels = self._process_batch(group_indices.tolist(), is_generated)
+            items = [dataset[i] for i in indices_block]
+            images, labels = zip(*items)
+            images = torch.stack(images)
 
-            # Cache the processed group
-            for i, index in enumerate(group_indices):
-                self.cached_dataset[index] = (images[i], labels[i])
+            images, style_mask = transform_batch(images)
+
+            # Clear the cache and fill it with the new block.
+            cache.clear()
+
+            for i, d_idx in enumerate(indices_block):
+                cache[d_idx] = (images[i], labels[i], style_mask[i])
+            
         
-        x, y = self.cached_dataset[idx]
+        x, y, style_flag = cache[global_index]
 
-        #augment iterably
-        augment = transforms.Compose([self.transforms_basic, self.transforms_iter_orig])
+        # Apply the iterative (per-image) transform based on whether the image was styled.
+        transform_iter = (transforms_iter_after_style if style_flag else transforms_iter_after_nostyle)
         
+        aug = transforms.Compose([self.transforms_basic, transform_iter])
+
+        # Handle robust_samples if needed.
         if self.robust_samples == 0:
-            return augment(x), y
-    
+            return aug(x), y
+        
         elif self.robust_samples == 1:
-            if idx < self.num_original:
-                x0, _ = self.original_dataset[idx]
-            else:
-                x0 = Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
-
-            x_tuple = (self.preprocess(x0), augment(x))
-            return x_tuple, y
+            x0, _ = dataset[global_index]
+            return (x0, aug(x)), y
         
         elif self.robust_samples == 2:
-            if idx < self.num_original:
-                x0, _ = self.original_dataset[idx]
-            else:
-                x0 = Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
-
-            x_tuple = (self.preprocess(x0), augment(x), augment(x))
-            return x_tuple, y
+            x0, _ = dataset[global_index]
+            return (x0, aug(x), aug(x)), y
 
     def __len__(self):
         return self.total_size
@@ -408,8 +421,6 @@ class AugmentedDataset(torch.utils.data.Dataset):
             aug = self.transforms_orig_after_style if is_stylized else self.transforms_orig_after_nostyle
         else:
             x, y = self.stylized_generated_dataset[idx - self.num_original]
-            #x = Image.fromarray(self.stylized_generated_dataset['images'][idx - self.num_original]) if is_stylized else Image.fromarray(self.generated_dataset['images'][idx - self.num_original])
-            #y = self.generated_dataset['labels'][idx - self.num_original]
             aug = self.transforms_gen_after_style if is_stylized else self.transforms_gen_after_nostyle
 
         augment = transforms.Compose([self.transforms_basic, aug])
@@ -541,14 +552,13 @@ class DataLoading():
         if self.num_original > 0:
             original_indices = torch.randperm(len(self.base_trainset))[:self.num_original]
             original_subset = SubsetWithTransform(Subset(self.base_trainset, original_indices), self.transforms_preprocess)
-            #original_subset = Subset(self.base_trainset, original_indices)
 
-            if self.stylization_orig is not None:
-                stylized_original_subset, style_mask_orig = self.stylization_orig(original_subset)
-            else: 
-                stylized_original_subset, style_mask_orig = original_subset, [False] * len(original_subset)
+            #if self.stylization_orig is not None:
+            #    stylized_original_subset, style_mask_orig = self.stylization_orig(original_subset)
+            #else: 
+            #    stylized_original_subset, style_mask_orig = original_subset, [False] * len(original_subset)
         else:
-            stylized_original_subset, style_mask_orig = None, []
+            original_subset = None #stylized_original_subset, style_mask_orig = None, []
         
         if self.num_generated > 0 and self.generated_dataset is not None:
             generated_indices = np.random.choice(len(self.generated_dataset['label']), size=self.num_generated, replace=False)
@@ -559,23 +569,18 @@ class DataLoading():
                 transform=self.transforms_preprocess
             )
 
-            #generated_subset = {
-            #    'images': self.generated_dataset['image'][generated_indices],
-            #    'labels': self.generated_dataset['label'][generated_indices]
-            #}
-
-            if self.stylization_gen is not None:
-                stylized_generated_subset, style_mask_gen = self.stylization_gen(generated_subset)
-            else:
-                stylized_generated_subset, style_mask_gen = generated_subset, [False] * len(generated_subset)
+            #if self.stylization_gen is not None:
+            #    stylized_generated_subset, style_mask_gen = self.stylization_gen(generated_subset)
+            #else:
+            #    stylized_generated_subset, style_mask_gen = generated_subset, [False] * len(generated_subset)
         else:
-            stylized_generated_subset, style_mask_gen = None, []
+            generated_subset = None #stylized_generated_subset, style_mask_gen = None, []
+
+        #style_mask = style_mask_orig + style_mask_gen
         
-        style_mask = style_mask_orig + style_mask_gen
-        
-        self.trainset = AugmentedDataset(stylized_original_subset, stylized_generated_subset, style_mask,
-                                         self.transforms_basic, self.transforms_orig_after_style, self.transforms_gen_after_style, 
-                                        self.transforms_orig_after_nostyle, self.transforms_gen_after_nostyle, self.robust_samples)
+        self.trainset = GroupedAugmentedDataset(original_subset, generated_subset, self.transforms_basic, self.stylization_orig, 
+                                self.stylization_gen, self.transforms_orig_after_style, self.transforms_gen_after_style, 
+                                self.transforms_orig_after_nostyle, self.transforms_gen_after_nostyle, self.robust_samples, epoch)
 
     def load_data_c(self, subset, subsetsize):
 
@@ -632,11 +637,11 @@ class DataLoading():
         g = torch.Generator()
         g.manual_seed(self.epoch + self.epochs * self.run)
 
-        if self.generated_ratio > 0.0:
-            self.CustomSampler = BalancedRatioSampler(self.trainset, generated_ratio=self.generated_ratio,
-                                                 batch_size=batchsize)
-        else:
-            self.CustomSampler = BatchSampler(RandomSampler(self.trainset), batch_size=batchsize, drop_last=False)
+        #if self.generated_ratio > 0.0:
+        self.CustomSampler = ReproducibleBalancedRatioSampler(self.trainset, generated_ratio=self.generated_ratio,
+                                                 batch_size=batchsize, epoch=self.epoch)
+        #else:
+        #    self.CustomSampler = BatchSampler(RandomSampler(self.trainset), batch_size=batchsize, drop_last=False)
 
         self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
                                       num_workers=number_workers, worker_init_fn=seed_worker, 
@@ -648,14 +653,18 @@ class DataLoading():
 
     def update_trainset(self, epoch, start_epoch):
 
-        if (self.generated_ratio != 0.0 or self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
+        if (self.generated_ratio != 0.0) and epoch != 0 and epoch != start_epoch:
                         
-            del self.trainset
-
+            #del self.trainset
             self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
+
+        elif (self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
+                        
+            #del self.trainset
+            self.trainset.set_epoch(epoch)
         
-        del self.trainloader
-        gc.collect()
+        #del self.trainloader
+        #gc.collect()
 
         g = torch.Generator()
         g.manual_seed(self.epoch + self.epochs * self.run)
