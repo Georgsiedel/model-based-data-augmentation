@@ -7,7 +7,7 @@ torch.cuda.device_count()
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [3,103,335,339,340]:
+    for experiment in [335,339,340]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)

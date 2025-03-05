@@ -45,7 +45,7 @@ def compute_c_corruptions(dataset, testsets_c, model, batchsize, num_classes, ev
         print(f"Testing on {dataset}-c/c-bar Benchmark")
 
     for corruption, corruption_testset in testsets_c.items():
-        testloader_c = DataLoader(corruption_testset, batch_size=batchsize, shuffle=False, pin_memory=True, num_workers=0)
+        testloader_c = DataLoader(corruption_testset, batch_size=batchsize, shuffle=False, pin_memory=True, num_workers=2)
         acc, rmsce_c = compute_c(testloader_c, model, num_classes)
         accs_c.append(acc)
         rmsce_c_list.append(rmsce_c)

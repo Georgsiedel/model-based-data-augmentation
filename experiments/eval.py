@@ -9,13 +9,12 @@ if module_path not in sys.path:
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-import torchvision.models as torchmodels
 import torch.utils.data
 from torchmetrics.classification import MulticlassCalibrationError
 import argparse
 import importlib
 from run_exp import device
-import models as low_dim_models
+import models
 import eval_adversarial
 import eval_corruptions
 import data
@@ -106,16 +105,10 @@ if __name__ == '__main__':
         Testtracker.initialize(run)
 
         # Load model
-        if args.dataset in ('CIFAR10', 'CIFAR100', 'TinyImageNet'):
-            model_class = getattr(low_dim_models, args.modeltype)
-            model = model_class(dataset=args.dataset, normalized=args.normalize, num_classes=Dataloader.num_classes,
-                                factor=args.pixel_factor, **args.modelparams)
-        else:
-            model_class = getattr(torchmodels, args.modeltype)
-            model = model_class(num_classes=Dataloader.num_classes, **args.modelparams)
+        model_class = getattr(models, args.modeltype)
+        model = model_class(dataset=args.dataset, normalized=args.normalize, num_classes=Dataloader.num_classes,
+                            factor=args.pixel_factor, **args.modelparams)
         model = model.to(device) #torch.nn.DataParallel(
-        cudnn.benchmark = True
-        #model.load_state_dict(torch.load(Testtracker.filename)['model_state_dict'], strict=True)
 
         state_dict = torch.load(Testtracker.filename, weights_only=True)['model_state_dict']
 

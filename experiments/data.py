@@ -154,11 +154,14 @@ class SubsetWithTransform(Dataset):
         return image, label
 
 class CustomDataset(Dataset):
-    def __init__(self, np_images, original_dataset, resize):
+    def __init__(self, np_images, original_dataset, resize, preprocessing):
         # Load images
-        self.images = torch.from_numpy(np_images).permute(0, 3, 1, 2) / 255
-        if resize == True:
-            self.images = transforms.Resize(224, antialias=True)(self.images)
+        self.np_images = np.memmap(np_images, dtype=np.float32, mode='r') if isinstance(np_images, str) else np_images
+        self.resize = resize
+        self.preprocessing = preprocessing
+        #self.images = torch.from_numpy(np_images).permute(0, 3, 1, 2) / 255
+        #if resize == True:
+        #    self.images = transforms.Resize(224, antialias=True)(self.images)
 
         # Extract labels from the original PyTorch dataset
         self.labels = [label for _, label in original_dataset]
@@ -168,7 +171,10 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, index):
         # Get image and label for the given index
-        image = self.images[index]
+        image = self.preprocessing(self.np_images[index])
+        if self.resize == True:
+            image = transforms.Resize(224, antialias=True)(image)
+
         label = self.labels[index]
 
         return image, label
@@ -583,8 +589,9 @@ class DataLoading():
             corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
 
             for corruption, set in corruptions:
+                
                 subtestset = self.testset
-                np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'))
+                np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'), mmap_mode='r')
                 np_data_c = np.array(np.array_split(np_data_c, 5))
 
                 if subset == True:
@@ -592,8 +599,7 @@ class DataLoading():
                     selected_indices = np.random.choice(10000, subsetsize, replace=False)
                     subtestset = Subset(self.testset, selected_indices)
                     np_data_c = [intensity_dataset[selected_indices] for intensity_dataset in np_data_c]
-
-                concat_intensities = ConcatDataset([CustomDataset(intensity_data_c, subtestset, self.resize) for intensity_data_c in np_data_c])
+                concat_intensities = ConcatDataset([CustomDataset(intensity_data_c, subtestset, self.resize, self.transforms_preprocess) for intensity_data_c in np_data_c])
                 c_datasets.append(concat_intensities)
 
         elif self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
@@ -617,7 +623,6 @@ class DataLoading():
             self.c_datasets_dict = {'combined': c_datasets}
         else:
             self.c_datasets_dict = {label: dataset for label, dataset in zip([corr for corr, _ in corruptions], c_datasets)}
-
         return self.c_datasets_dict
 
     def get_loader(self, batchsize, number_workers):

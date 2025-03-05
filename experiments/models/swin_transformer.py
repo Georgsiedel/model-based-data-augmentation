@@ -77,34 +77,6 @@ class PatchMerging(nn.Module):
         x = self.reduction(x)  # ... H/2 W/2 2*C
         return x
 
-
-class PatchMergingV2(nn.Module):
-    """Patch Merging Layer for Swin Transformer V2.
-    Args:
-        dim (int): Number of input channels.
-        norm_layer (nn.Module): Normalization layer. Default: nn.LayerNorm.
-    """
-
-    def __init__(self, dim: int, norm_layer: Callable[..., nn.Module] = nn.LayerNorm):
-        super().__init__()
-        _log_api_usage_once(self)
-        self.dim = dim
-        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
-        self.norm = norm_layer(2 * dim)  # difference
-
-    def forward(self, x: Tensor):
-        """
-        Args:
-            x (Tensor): input tensor with expected layout of [..., H, W, C]
-        Returns:
-            Tensor with layout of [..., H/2, W/2, 2*C]
-        """
-        x = _patch_merging_pad(x)
-        x = self.reduction(x)  # ... H/2 W/2 2*C
-        x = self.norm(x)
-        return x
-
-
 def shifted_window_attention(
     input: Tensor,
     qkv_weight: Tensor,
@@ -303,93 +275,6 @@ class ShiftedWindowAttention(nn.Module):
             training=self.training,
         )
 
-
-class ShiftedWindowAttentionV2(ShiftedWindowAttention):
-    """
-    See :func:`shifted_window_attention_v2`.
-    """
-
-    def __init__(
-        self,
-        dim: int,
-        window_size: List[int],
-        shift_size: List[int],
-        num_heads: int,
-        qkv_bias: bool = True,
-        proj_bias: bool = True,
-        attention_dropout: float = 0.0,
-        dropout: float = 0.0,
-    ):
-        super().__init__(
-            dim,
-            window_size,
-            shift_size,
-            num_heads,
-            qkv_bias=qkv_bias,
-            proj_bias=proj_bias,
-            attention_dropout=attention_dropout,
-            dropout=dropout,
-        )
-
-        self.logit_scale = nn.Parameter(torch.log(10 * torch.ones((num_heads, 1, 1))))
-        # mlp to generate continuous relative position bias
-        self.cpb_mlp = nn.Sequential(
-            nn.Linear(2, 512, bias=True), nn.ReLU(inplace=True), nn.Linear(512, num_heads, bias=False)
-        )
-        if qkv_bias:
-            length = self.qkv.bias.numel() // 3
-            self.qkv.bias[length : 2 * length].data.zero_()
-
-    def define_relative_position_bias_table(self):
-        # get relative_coords_table
-        relative_coords_h = torch.arange(-(self.window_size[0] - 1), self.window_size[0], dtype=torch.float32)
-        relative_coords_w = torch.arange(-(self.window_size[1] - 1), self.window_size[1], dtype=torch.float32)
-        relative_coords_table = torch.stack(torch.meshgrid([relative_coords_h, relative_coords_w], indexing="ij"))
-        relative_coords_table = relative_coords_table.permute(1, 2, 0).contiguous().unsqueeze(0)  # 1, 2*Wh-1, 2*Ww-1, 2
-
-        relative_coords_table[:, :, :, 0] /= self.window_size[0] - 1
-        relative_coords_table[:, :, :, 1] /= self.window_size[1] - 1
-
-        relative_coords_table *= 8  # normalize to -8, 8
-        relative_coords_table = (
-            torch.sign(relative_coords_table) * torch.log2(torch.abs(relative_coords_table) + 1.0) / 3.0
-        )
-        self.register_buffer("relative_coords_table", relative_coords_table)
-
-    def get_relative_position_bias(self) -> torch.Tensor:
-        relative_position_bias = _get_relative_position_bias(
-            self.cpb_mlp(self.relative_coords_table).view(-1, self.num_heads),
-            self.relative_position_index,  # type: ignore[arg-type]
-            self.window_size,
-        )
-        relative_position_bias = 16 * torch.sigmoid(relative_position_bias)
-        return relative_position_bias
-
-    def forward(self, x: Tensor):
-        """
-        Args:
-            x (Tensor): Tensor with layout of [B, H, W, C]
-        Returns:
-            Tensor with same layout as input, i.e. [B, H, W, C]
-        """
-        relative_position_bias = self.get_relative_position_bias()
-        return shifted_window_attention(
-            x,
-            self.qkv.weight,
-            self.proj.weight,
-            relative_position_bias,
-            self.window_size,
-            self.num_heads,
-            shift_size=self.shift_size,
-            attention_dropout=self.attention_dropout,
-            dropout=self.dropout,
-            qkv_bias=self.qkv.bias,
-            proj_bias=self.proj.bias,
-            logit_scale=self.logit_scale,
-            training=self.training,
-        )
-
-
 class SwinTransformerBlock(nn.Module):
     """
     Swin Transformer Block.
@@ -445,57 +330,6 @@ class SwinTransformerBlock(nn.Module):
         x = x + self.stochastic_depth(self.attn(self.norm1(x)))
         x = x + self.stochastic_depth(self.mlp(self.norm2(x)))
         return x
-
-
-class SwinTransformerBlockV2(SwinTransformerBlock):
-    """
-    Swin Transformer V2 Block.
-    Args:
-        dim (int): Number of input channels.
-        num_heads (int): Number of attention heads.
-        window_size (List[int]): Window size.
-        shift_size (List[int]): Shift size for shifted window attention.
-        mlp_ratio (float): Ratio of mlp hidden dim to embedding dim. Default: 4.0.
-        dropout (float): Dropout rate. Default: 0.0.
-        attention_dropout (float): Attention dropout rate. Default: 0.0.
-        stochastic_depth_prob: (float): Stochastic depth rate. Default: 0.0.
-        norm_layer (nn.Module): Normalization layer.  Default: nn.LayerNorm.
-        attn_layer (nn.Module): Attention layer. Default: ShiftedWindowAttentionV2.
-    """
-
-    def __init__(
-        self,
-        dim: int,
-        num_heads: int,
-        window_size: List[int],
-        shift_size: List[int],
-        mlp_ratio: float = 4.0,
-        dropout: float = 0.0,
-        attention_dropout: float = 0.0,
-        stochastic_depth_prob: float = 0.0,
-        norm_layer: Callable[..., nn.Module] = nn.LayerNorm,
-        attn_layer: Callable[..., nn.Module] = ShiftedWindowAttentionV2,
-    ):
-        super().__init__(
-            dim,
-            num_heads,
-            window_size,
-            shift_size,
-            mlp_ratio=mlp_ratio,
-            dropout=dropout,
-            attention_dropout=attention_dropout,
-            stochastic_depth_prob=stochastic_depth_prob,
-            norm_layer=norm_layer,
-            attn_layer=attn_layer,
-        )
-
-    def forward(self, x: Tensor):
-        # Here is the difference, we apply norm after the attention in V2.
-        # In V1 we applied norm before the attention.
-        x = x + self.stochastic_depth(self.norm1(self.attn(x)))
-        x = x + self.stochastic_depth(self.norm2(self.mlp(x)))
-        return x
-
 
 class SwinTransformer(ct_model.CtModel):
     """
@@ -619,7 +453,6 @@ class SwinTransformer(ct_model.CtModel):
         else:
             return x
 
-
 def _swin_transformer(
     patch_size: List[int],
     embed_dim: int,
@@ -638,7 +471,7 @@ def _swin_transformer(
     if weights is not None:
         weights_num_classes = len(weights.meta["categories"])
         #_ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
-
+    
     model = SwinTransformer(
         patch_size=patch_size,
         embed_dim=embed_dim,
@@ -675,72 +508,72 @@ def _swin_transformer(
 
     return model
 
-
 _COMMON_META = {
     "categories": _IMAGENET_CATEGORIES,
 }
 
-class Swin_V2_T_Weights(WeightsEnum):
+class Swin_T_Weights(WeightsEnum):
     IMAGENET1K_V1 = Weights(
-        url="https://download.pytorch.org/models/swin_v2_t-b137f0e2.pth",
+        url="https://download.pytorch.org/models/swin_t-704ceda3.pth",
         transforms=partial(
-            ImageClassification, crop_size=256, resize_size=260, interpolation=InterpolationMode.BICUBIC
+            ImageClassification, crop_size=224, resize_size=232, interpolation=InterpolationMode.BICUBIC
         ),
         meta={
             **_COMMON_META,
-            "num_params": 28351570,
-            "min_size": (256, 256),
-            "recipe": "https://github.com/pytorch/vision/tree/main/references/classification#swintransformer-v2",
+            "num_params": 28288354,
+            "min_size": (224, 224),
+            "recipe": "https://github.com/pytorch/vision/tree/main/references/classification#swintransformer",
             "_metrics": {
                 "ImageNet-1K": {
-                    "acc@1": 82.072,
-                    "acc@5": 96.132,
+                    "acc@1": 81.474,
+                    "acc@5": 95.776,
                 }
             },
-            "_ops": 5.94,
-            "_file_size": 108.626,
+            "_ops": 4.491,
+            "_file_size": 108.19,
             "_docs": """These weights reproduce closely the results of the paper using a similar training recipe.""",
         },
     )
     DEFAULT = IMAGENET1K_V1
 
-@handle_legacy_interface(weights=("pretrained", Swin_V2_T_Weights.IMAGENET1K_V1))
-def Swin_V2_T(*, weights: Optional[Swin_V2_T_Weights] = None, dataset: str, normalized: bool, num_classes: int, progress: bool = True, **kwargs: Any) -> SwinTransformer:
+@handle_legacy_interface(weights=("pretrained", Swin_T_Weights.IMAGENET1K_V1))
+def Swin_V2_T(*, weights: Optional[Swin_T_Weights] = None, dataset: str, normalized: bool, num_classes: int, progress: bool = True, **kwargs: Any) -> SwinTransformer:
     """
-    Constructs a swin_v2_tiny architecture from
-    `Swin Transformer V2: Scaling Up Capacity and Resolution <https://arxiv.org/abs/2111.09883>`_.
+        Constructs a swin_tiny architecture from
+        `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows <https://arxiv.org/abs/2103.14030>`_.
 
-    Args:
-        weights (:class:`~torchvision.models.Swin_V2_T_Weights`, optional): The
-            pretrained weights to use. See
-            :class:`~torchvision.models.Swin_V2_T_Weights` below for
-            more details, and possible values. By default, no pre-trained
-            weights are used.
-        progress (bool, optional): If True, displays a progress bar of the
-            download to stderr. Default is True.
-        **kwargs: parameters passed to the ``torchvision.models.swin_transformer.SwinTransformer``
-            base class. Please refer to the `source code
-            <https://github.com/pytorch/vision/blob/main/torchvision/models/swin_transformer.py>`_
-            for more details about this class.
+        Args:
+            weights (:class:`~torchvision.models.Swin_T_Weights`, optional): The
+                pretrained weights to use. See
+                :class:`~torchvision.models.Swin_T_Weights` below for
+                more details, and possible values. By default, no pre-trained
+                weights are used.
+            progress (bool, optional): If True, displays a progress bar of the
+                download to stderr. Default is True.
+            **kwargs: parameters passed to the ``torchvision.models.swin_transformer.SwinTransformer``
+                base class. Please refer to the `source code
+                <https://github.com/pytorch/vision/blob/main/torchvision/models/swin_transformer.py>`_
+                for more details about this class.
 
-    .. autoclass:: torchvision.models.Swin_V2_T_Weights
-        :members:
-    """
-    weights = Swin_V2_T_Weights.verify(weights)
+        .. autoclass:: torchvision.models.Swin_T_Weights
+            :members:
+        """
+
+    factor = kwargs.pop('factor', None)
+
+    weights = Swin_T_Weights.verify(weights)
 
     return _swin_transformer(
         patch_size=[4, 4],
         embed_dim=96,
         depths=[2, 2, 6, 2],
         num_heads=[3, 6, 12, 24],
-        window_size=[8, 8],
+        window_size=[7, 7],
         stochastic_depth_prob=0.2,
         weights=weights,
         dataset=dataset,
         normalized=normalized,
         num_classes=num_classes,
         progress=progress,
-        block=SwinTransformerBlockV2,
-        downsample_layer=PatchMergingV2,
         **kwargs,
     )

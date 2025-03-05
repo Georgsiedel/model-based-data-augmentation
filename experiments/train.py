@@ -14,14 +14,13 @@ from tqdm import tqdm
 import torch.amp
 import torch.optim as optim
 from torch.optim.swa_utils import AveragedModel, SWALR
-import torchvision.models as torchmodels
 from experiments.utils import plot_images
 import time
 
 import data
 import utils
 import losses
-import models as low_dim_models
+import models
 from eval_corruptions import compute_c_corruptions
 from eval_adversarial import fast_gradient_validation
 
@@ -225,13 +224,10 @@ if __name__ == '__main__':
 
     # Construct model
     print(f'\nBuilding {args.modeltype} model with {args.modelparams} | Loss Function: {args.loss}, Stability Loss: {args.robust_loss}, Trades Loss: {args.trades_loss}')
-    if args.dataset in ('CIFAR10', 'CIFAR100', 'TinyImageNet'):
-        model_class = getattr(low_dim_models, args.modeltype)
-        model = model_class(dataset=args.dataset, normalized =args.normalize, num_classes=Dataloader.num_classes,
-                            factor=args.pixel_factor, **args.modelparams)
-    else:
-        model_class = getattr(torchmodels, args.modeltype)
-        model = model_class(num_classes = Dataloader.num_classes, **args.modelparams)
+    
+    model_class = getattr(models, args.modeltype)
+    model = model_class(dataset=args.dataset, normalized =args.normalize, num_classes=Dataloader.num_classes,
+                        factor=args.pixel_factor, **args.modelparams)
     model = model.to(device) #torch.nn.DataParallel(model).to(device)
 
     # Define Optimizer, Learningrate Scheduler, Scaler, and Early Stopping
