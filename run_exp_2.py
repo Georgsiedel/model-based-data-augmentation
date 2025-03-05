@@ -18,14 +18,12 @@ if __name__ == '__main__':
         if experiment in [338,337,336]:
             runs = 3
             run_iter =[1,2]
-        if experiment in [331]:
+        if experiment in [338]:
             run_iter =[2]
 
 
         for run in run_iter:
-            if experiment in [338] and run in [1]:
-                resume = True
-            elif experiment in [331] and run in [2]:
+            if experiment in [338] and run in [2]:
                 resume = True
             else:
                 resume = False
