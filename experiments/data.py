@@ -189,20 +189,23 @@ class ReproducibleBalancedRatioSampler(Sampler):
         self.num_original = self.size - self.num_generated
         self.num_generated_batch = int(self.batch_size * self.generated_ratio)
         self.num_original_batch = self.batch_size - self.num_generated_batch
-
-    def generate_indices_order(self, num_samples, epoch):
+        
+    def generate_indices_order(self, num_original, num_generated, epoch):
         # Use a local RNG instance that won’t disturb your global seeds.
         local_rng = random.Random(epoch)
-        indices = list(range(num_samples))
-        local_rng.shuffle(indices)
-        return indices
+        indices_original = list(range(num_original))
+        indices_generated = list(range(num_original, num_generated + num_original))
+
+        local_rng.shuffle(indices_original)
+        local_rng.shuffle(indices_generated)
+
+        return indices_original, indices_generated
 
     def __iter__(self):
 
         # Create a single permutation for the whole epoch which is reproducible.
         # generated permutation requires generated images appended to the back of the dataset!
-        original_perm = self.generate_indices_order(self.num_original, epoch=self.current_epoch)
-        generated_perm = self.generate_indices_order(self.num_generated, epoch=self.current_epoch)
+        original_perm, generated_perm = self.generate_indices_order(self.num_original, self.num_generated, self.current_epoch)
         self.current_epoch += 1
 
         batch_starts = range(0, self.size, self.batch_size)  # Start points for each batch
@@ -265,17 +268,20 @@ class GroupedAugmentedDataset(torch.utils.data.Dataset):
         """
         At the beginning of each epoch, regenerate the random ordering for each domain and clear caches.
         """
-        self.original_perm = self.generate_indices_order(self.num_original, epoch)
-        self.generated_perm = self.generate_indices_order(self.num_generated, epoch)
+        self.original_perm, self.generated_perm = self.generate_indices_order(self.num_original, self.num_generated, epoch)
         self.cache_orig.clear()
         self.cache_gen.clear()
         
-    def generate_indices_order(self, num_samples, epoch):
+    def generate_indices_order(self, num_original, num_generated, epoch):
         # Use a local RNG instance that won’t disturb your global seeds.
         local_rng = random.Random(epoch)
-        indices = list(range(num_samples))
-        local_rng.shuffle(indices)
-        return indices
+        indices_original = list(range(num_original))
+        indices_generated = list(range(num_original, num_generated + num_original))
+
+        local_rng.shuffle(indices_original)
+        local_rng.shuffle(indices_generated)
+
+        return indices_original, indices_generated
     
     def __getitem__(self, idx):
         """
@@ -289,7 +295,7 @@ class GroupedAugmentedDataset(torch.utils.data.Dataset):
         """
         # Determine domain.
         if idx < self.num_original:
-            global_index = idx  # for original images
+            dataset_specific_index = idx  # for original images
             perm = self.original_perm
             cache = self.cache_orig
             cache_size = self.cache_size_orig
@@ -298,7 +304,7 @@ class GroupedAugmentedDataset(torch.utils.data.Dataset):
             transforms_iter_after_style = self.transforms_iter_orig_after_style
             transforms_iter_after_nostyle = self.transforms_iter_orig_after_nostyle
         else:
-            global_index = idx - self.num_original  # for generated images, adjust index
+            dataset_specific_index = idx - self.num_original  # for generated images, adjust index
             perm = self.generated_perm
             cache = self.cache_gen
             cache_size = self.cache_size_gen
@@ -308,17 +314,17 @@ class GroupedAugmentedDataset(torch.utils.data.Dataset):
             transforms_iter_after_nostyle = self.transforms_iter_gen_after_nostyle
 
         # If the requested global index is cached, retrieve it.
-        if global_index not in cache:
+        if dataset_specific_index not in cache:
 
             # Not in cache. Find the position of this global index in the permutation.
             try:
-                pos = perm.index(global_index)
+                pos = perm.index(idx)
             except ValueError:
                 pos = 0
             # Get the block of indices: from the found position up to cache_size items.
             indices_block = perm[pos: pos + cache_size]
 
-            items = [dataset[i] for i in indices_block]
+            items = [dataset[i - self.num_original] for i in indices_block]
             images, labels = zip(*items)
             images = torch.stack(images)
 
@@ -329,9 +335,8 @@ class GroupedAugmentedDataset(torch.utils.data.Dataset):
 
             for i, d_idx in enumerate(indices_block):
                 cache[d_idx] = (images[i], labels[i], style_mask[i])
-            
         
-        x, y, style_flag = cache[global_index]
+        x, y, style_flag = cache[idx]
 
         # Apply the iterative (per-image) transform based on whether the image was styled.
         transform_iter = (transforms_iter_after_style if style_flag else transforms_iter_after_nostyle)
@@ -343,11 +348,11 @@ class GroupedAugmentedDataset(torch.utils.data.Dataset):
             return aug(x), y
         
         elif self.robust_samples == 1:
-            x0, _ = dataset[global_index]
+            x0, _ = dataset[dataset_specific_index]
             return (x0, aug(x)), y
         
         elif self.robust_samples == 2:
-            x0, _ = dataset[global_index]
+            x0, _ = dataset[dataset_specific_index]
             return (x0, aug(x), aug(x)), y
 
     def __len__(self):
