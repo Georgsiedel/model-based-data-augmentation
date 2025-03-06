@@ -313,30 +313,34 @@ class GroupedAugmentedDataset(torch.utils.data.Dataset):
             transforms_iter_after_style = self.transforms_iter_gen_after_style
             transforms_iter_after_nostyle = self.transforms_iter_gen_after_nostyle
 
-        # If the requested global index is cached, retrieve it.
-        if dataset_specific_index not in cache:
+        if transform_batch == None:
+            x, y = dataset[dataset_specific_index]
+            
+        else:
+            # If the requested global index is cached, retrieve it.
+            if idx not in cache:
 
-            # Not in cache. Find the position of this global index in the permutation.
-            try:
-                pos = perm.index(idx)
-            except ValueError:
-                pos = 0
-            # Get the block of indices: from the found position up to cache_size items.
-            indices_block = perm[pos: pos + cache_size]
+                # Not in cache. Find the position of this global index in the permutation.
+                try:
+                    pos = perm.index(idx)
+                except ValueError:
+                    pos = 0
+                # Get the block of indices: from the found position up to cache_size items.
+                indices_block = perm[pos: pos + cache_size]
 
-            items = [dataset[i - self.num_original] for i in indices_block]
-            images, labels = zip(*items)
-            images = torch.stack(images)
+                items = [dataset[i - self.num_original] for i in indices_block]
+                images, labels = zip(*items)
+                images = torch.stack(images)
 
-            images, style_mask = transform_batch(images)
+                images, style_mask = transform_batch(images)
 
-            # Clear the cache and fill it with the new block.
-            cache.clear()
+                # Clear the cache and fill it with the new block.
+                cache.clear()
 
-            for i, d_idx in enumerate(indices_block):
-                cache[d_idx] = (images[i], labels[i], style_mask[i])
-        
-        x, y, style_flag = cache[idx]
+                for i, d_idx in enumerate(indices_block):
+                    cache[d_idx] = (images[i], labels[i], style_mask[i])
+            
+            x, y, style_flag = cache[idx]
 
         # Apply the iterative (per-image) transform based on whether the image was styled.
         transform_iter = (transforms_iter_after_style if style_flag else transforms_iter_after_nostyle)
