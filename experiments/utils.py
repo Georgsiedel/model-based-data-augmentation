@@ -735,10 +735,16 @@ class TestTracking:
                 f"_{train_corruption['noise_type']}_eps_{train_corruption['epsilon']}_"
                 f"{train_corruption['sphere']}_"
             )
-        self.filename = os.path.abspath(
+        _dir_name = os.path.dirname(__file__)
+        _trained_model_dir = (
             f"../trained_models/{self.dataset}/{self.modeltype}/config{self.experiment}"
             f"{self.fileaddition}run_{run}.pth"
         )
+        self.filename = os.path.join(_dir_name, _trained_model_dir)
+        # self.filename = os.path.abspath(
+        #     f"../trained_models/{self.dataset}/{self.modeltype}/config{self.experiment}"
+        #     f"{self.fileaddition}run_{run}.pth"
+        # )
 
     def track_results(self, new_results):
         for element in new_results:
