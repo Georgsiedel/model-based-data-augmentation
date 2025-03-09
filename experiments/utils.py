@@ -610,17 +610,16 @@ class TestTracking:
 
         test_corruptions_string = np.array(["Standard_Acc", "RMSCE"])
         if self.test_on_c == True:
-            test_corruptions_label = np.loadtxt(
-                os.path.abspath("../data/c-labels.txt"), dtype=list
-            )
+            file_dir = os.path.dirname(__file__)
+            data_dir = os.path.join(file_dir, "../data")
+            corruption_file = os.path.join(data_dir, "c-labels.txt")
+            test_corruptions_label = np.loadtxt(corruption_file, dtype=list)
             if self.dataset == "CIFAR10" or self.dataset == "CIFAR100":
-                test_corruptions_bar_label = np.loadtxt(
-                    os.path.abspath("../data/c-bar-labels-cifar.txt"), dtype=list
-                )
+                corruption_bar_file = os.path.join(data_dir, "c-bar-labels-cifar.txt")
+                test_corruptions_bar_label = np.loadtxt(corruption_bar_file, dtype=list)
             elif self.dataset == "ImageNet" or self.dataset == "TinyImageNet":
-                test_corruptions_bar_label = np.loadtxt(
-                    os.path.abspath("../data/c-bar-labels-IN.txt"), dtype=list
-                )
+                corruption_bar_file = os.path.join(data_dir, "c-bar-labels-IN.txt")
+                test_corruptions_bar_label = np.loadtxt(corruption_bar_file, dtype=list)
             test_corruptions_string = np.append(
                 test_corruptions_string, test_corruptions_label, axis=0
             )
