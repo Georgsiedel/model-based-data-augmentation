@@ -83,7 +83,7 @@ if __name__ == "__main__":
             "python experiments/eval.py --resume={} --experiment={} --runs={} --batchsize={} --dataset={} "
             '--modeltype={} --modelparams="{}" --resize={} --combine_test_corruptions={} --number_workers={} '
             '--normalize={} --pixel_factor={} --test_on_c={} --calculate_adv_distance={} --adv_distance_params="{}" '
-            '--calculate_autoattack_robustness={} --autoattack_params="{}" --combine_train_corruptions={} '.format(
+            '--calculate_autoattack_robustness={} --autoattack_params="{}" --combine_train_corruptions={} --kaggle={} '.format(
                 resume,
                 experiment,
                 runs,
@@ -102,6 +102,7 @@ if __name__ == "__main__":
                 config.calculate_autoattack_robustness,
                 config.autoattack_params,
                 config.combine_train_corruptions,
+                config.kaggle,
             )
         )
         os.system(cmdeval)
