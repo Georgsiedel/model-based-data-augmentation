@@ -24,13 +24,13 @@ validonadv = False
 lrschedule = 'CosineAnnealingWarmRestarts'
 learningrate = 0.0001
 epochs = 30
-lrparams = {'T_0': 10, 'T_mult': 2}
+lrparams = {'T_0': 30, 'T_mult': 2}
 warmupepochs = 0
 earlystop = False
 earlystopPatience = 15
 optimizer = 'AdamW'
 optimizerparams = {'weight_decay': 0.05}
-number_workers = 4
+number_workers = 8
 modeltype = 'ViT_B_16'
 modelparams = {'weights': 'IMAGENET1K_V1'}
 resize = True
@@ -122,6 +122,7 @@ elif dataset == 'CIFAR100':
     pixel_factor = 1
 elif dataset == 'ImageNet':
     num_classes = 1000
+    pixel_factor = 1
 elif dataset == 'TinyImageNet':
     num_classes = 200
     pixel_factor = 2
