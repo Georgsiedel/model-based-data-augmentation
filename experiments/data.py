@@ -15,6 +15,8 @@ import numpy as np
 import experiments.custom_transforms as custom_transforms
 from run_exp import device
 from experiments.utils import plot_images
+import imagecorruptions
+from experiments.utils import build_transform_c_bar
 
 def normalization_values(batch, dataset, normalized, manifold=False, manifold_factor=1):
 
@@ -154,17 +156,12 @@ class SubsetWithTransform(Dataset):
         return image, label
 
 class CustomDataset(Dataset):
-    def __init__(self, np_images, original_dataset, resize, preprocessing):
+    def __init__(self, np_images, testlabels, resize, preprocessing):
         # Load images
         self.np_images = np.memmap(np_images, dtype=np.float32, mode='r') if isinstance(np_images, str) else np_images
         self.resize = resize
         self.preprocessing = preprocessing
-        #self.images = torch.from_numpy(np_images).permute(0, 3, 1, 2) / 255
-        #if resize == True:
-        #    self.images = transforms.Resize(224, antialias=True)(self.images)
-
-        # Extract labels from the original PyTorch dataset
-        self.labels = [label for _, label in original_dataset]
+        self.labels = testlabels
 
     def __len__(self):
         return len(self.labels)
@@ -178,6 +175,66 @@ class CustomDataset(Dataset):
         label = self.labels[index]
 
         return image, label
+    
+def read_corruption_csv(filename):
+    with open(filename) as f:
+        lines = [l.rstrip() for l in f.readlines()]
+    corruptions = {}
+    for line in lines:
+        vals = line.split(",")
+        if not vals:
+            continue
+        corruptions[vals[0]] = [float(v) for v in vals[1:]]
+    return corruptions
+    
+class PilToNumpy(object):
+    def __init__(self, as_float=False, scaled_to_one=False):
+        self.as_float = as_float
+        self.scaled_to_one = scaled_to_one
+        assert (not scaled_to_one) or (as_float and scaled_to_one),\
+                "Must output a float if rescaling to one."
+
+    def __call__(self, image):
+        if not self.as_float:
+            return np.array(image).astype(np.uint8)
+        elif not self.scaled_to_one:
+            return np.array(image).astype(np.float32)
+        else:
+            return np.array(image).astype(np.float32) / 255
+
+class NumpyToPil(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, image):
+        return Image.fromarray(image)
+
+class RandomCommonCorruptionTransform:
+    def __init__(self, set, corruption_name, dataset):
+        self.corruption_name = corruption_name
+        self.set = set
+        self.dataset = dataset
+        self.TtoPIL = transforms.ToPILImage()
+        self.PILtoNP = PilToNumpy()
+        self.NPtoPIL = NumpyToPil()
+        self.ToTensor = transforms.ToTensor()
+
+    def __call__(self, img):
+        severity = random.randint(1, 5)
+
+        if self.set == 'c':
+            img_np = self.PILtoNP(self.TtoPIL(img))
+            corrupted_img = self.ToTensor(self.NPtoPIL(imagecorruptions.corrupt(img_np, self.corruption_name, severity)))
+        elif self.set == 'c-bar':
+            comp = transforms.compose([self.TtoPIL,
+                                self.PILtoNP,
+                build_transform_c_bar(self.corruption_name, severity, self.dataset),
+                self.NPtoPIL,
+                self.ToTensor
+                ])
+            corrupted_img = comp(img)
+
+        return corrupted_img
 
 class GroupedBalancedRatioSampler(Sampler):
     def __init__(self, dataset, generated_ratio, batch_size, group_size=32):
@@ -432,13 +489,12 @@ class AugmentedDataset(torch.utils.data.Dataset):
         return self.total_size
 
 class DataLoading():
-    def __init__(self, dataset, epochs=200, generated_ratio=0.0, resize = False, run=0, test_only = False, factor = 1):
+    def __init__(self, dataset, epochs=200, generated_ratio=0.0, resize = False, run=0, factor = 1):
         self.dataset = dataset
         self.generated_ratio = generated_ratio
         self.resize = resize
         self.run = run
         self.epochs = epochs
-        self.test_only = test_only
         self.factor = factor
 
     def create_transforms(self, train_aug_strat_orig, train_aug_strat_gen, RandomEraseProbability=0.0):
@@ -476,52 +532,50 @@ class DataLoading():
         self.stylization_orig, self.transforms_orig_after_style, self.transforms_orig_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_orig, re, self.dataset, self.factor)
         self.stylization_gen, self.transforms_gen_after_style, self.transforms_gen_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_gen, re, self.dataset, self.factor)
 
-    def load_base_data(self, validontest, run=0):
+    def load_base_data(self, validontest, test_only=False):
 
-        # Trainset and Validset
-        if self.test_only == False:
+        if validontest:
+
+            if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
+                self.testset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/val'),
+                                                                transform=self.transforms_preprocess)
+                if test_only:
+                    self.base_trainset = None
+                else:
+                    self.base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train'))
+
+            elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
+                load_helper = getattr(torchvision.datasets, self.dataset)
+                self.testset = load_helper(root=os.path.abspath('../data'), train=False, download=True,
+                                        transform=self.transforms_preprocess)
+                if test_only:
+                    self.base_trainset = None
+                else:
+                    self.base_trainset = load_helper(root=os.path.abspath('../data'), train=True, download=True)
+                
+            else:
+                print('Dataset not loadable')
+        
+        else:
             if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
                 base_trainset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/train'))
-            else:
+            elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
                 load_helper = getattr(torchvision.datasets, self.dataset)
                 base_trainset = load_helper(root=os.path.abspath('../data'), train=True, download=True)
-
-            if validontest == False:
-                validsplit = 0.2
-                train_indices, val_indices, _, _ = train_test_split(
-                    range(len(base_trainset)),
-                    base_trainset.targets,
-                    stratify=base_trainset.targets,
-                    test_size=validsplit,
-                    random_state=run)  # same validation split for same runs, but new validation on multiple runs
-                self.base_trainset = Subset(base_trainset, train_indices)
-                validset = Subset(base_trainset, val_indices)
-                self.validset = [(self.transforms_preprocess(data), target) for data, target in validset]
             else:
-                if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                    self.validset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/val'),
-                                                                transform=self.transforms_preprocess)
-                elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
-                    load_helper = getattr(torchvision.datasets, self.dataset)
-                    self.validset = load_helper(root=os.path.abspath('../data'), train=False, download=True,
-                                           transform=self.transforms_preprocess)
-                else:
-                    print('Dataset not loadable')
-                self.base_trainset = base_trainset
-        else:
-            self.trainset = None
-            self.validset = None
-
-        #Testset
-        if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-            self.testset = torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}/val'),
-                                                        transform=self.transforms_preprocess)
-        elif self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
-            load_helper = getattr(torchvision.datasets, self.dataset)
-            self.testset = load_helper(root=os.path.abspath('../data'), train=False, download=True, transform=self.transforms_preprocess)
-        else:
-            print('Dataset not loadable')
-
+                print('Dataset not loadable')  
+        
+            validsplit = 0.2
+            train_indices, val_indices, _, _ = train_test_split(
+                range(len(base_trainset)),
+                base_trainset.targets,
+                stratify=base_trainset.targets,
+                test_size=validsplit,
+                random_state=self.run)  # same validation split for same runs, but new validation on multiple runs
+            self.base_trainset = Subset(base_trainset, train_indices)
+            validset = Subset(base_trainset, val_indices)
+            self.testset = [(self.transforms_preprocess(data), target) for data, target in validset]
+                
         self.num_classes = len(self.testset.classes)
     
     def load_augmented_traindata(self, target_size, epoch=0, robust_samples=0):
@@ -532,6 +586,7 @@ class DataLoading():
         self.epoch = epoch
 
         torch.manual_seed(self.epoch + self.epochs * self.run)
+        torch.cuda.manual_seed(self.epoch + self.epochs * self.run)
         np.random.seed(self.epoch + self.epochs * self.run)
         random.seed(self.epoch + self.epochs * self.run)
 
@@ -577,43 +632,73 @@ class DataLoading():
                                          self.transforms_basic, self.transforms_orig_after_style, self.transforms_gen_after_style, 
                                         self.transforms_orig_after_nostyle, self.transforms_gen_after_nostyle, self.robust_samples)
 
-    def load_data_c(self, subset, subsetsize):
+    def load_data_c(self, validontest, subset, subsetsize):
 
         c_datasets = []
         #c-corruption benchmark: https://github.com/hendrycks/robustness
         corruptions_c = np.asarray(np.loadtxt(os.path.abspath('../data/c-labels.txt'), dtype=list))
+        
+        np.random.seed(self.run) # to make subsamples reproducible
+        torch.manual_seed(self.run)
+        random.seed(self.run)
 
         if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
             #c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
+            
+            #corruptions_bar = np.asarray(read_corruption_csv(os.path.abspath('../data/cifar_c_bar.csv')))
+
             corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-cifar.txt'), dtype=list))
             corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
+            testlabels = [label for _, label in self.testset]
 
             for corruption, set in corruptions:
-                
-                subtestset = self.testset
-                np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'), mmap_mode='r')
-                np_data_c = np.array(np.array_split(np_data_c, 5))
 
-                if subset == True:
-                    np.random.seed(0)
-                    selected_indices = np.random.choice(10000, subsetsize, replace=False)
-                    subtestset = Subset(self.testset, selected_indices)
-                    np_data_c = [intensity_dataset[selected_indices] for intensity_dataset in np_data_c]
-                concat_intensities = ConcatDataset([CustomDataset(intensity_data_c, subtestset, self.resize, self.transforms_preprocess) for intensity_data_c in np_data_c])
-                c_datasets.append(concat_intensities)
+                if validontest:
+                    subtestlabels = testlabels
+                    np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'), mmap_mode='r')
+                    np_data_c = np.array(np.array_split(np_data_c, 5))
+
+                    if subset == True:
+                        selected_indices = np.random.choice(10000, subsetsize, replace=False)
+                        subtestlabels = testlabels[selected_indices]
+                        np_data_c = [intensity_dataset[selected_indices] for intensity_dataset in np_data_c]
+                    concat_intensities = ConcatDataset([CustomDataset(intensity_data_c, subtestlabels, self.resize, self.transforms_preprocess) for intensity_data_c in np_data_c])
+                    c_datasets.append(concat_intensities)
+
+                else:
+                    random_corrupted_testset = SubsetWithTransform(self.testset, 
+                                                    transform=RandomCommonCorruptionTransform(set, corruption, self.dataset))
+                    if subset == True:
+                        selected_indices = np.random.choice(10000, subsetsize, replace=False)
+                        random_corrupted_testset = Subset(random_corrupted_testset, selected_indices)
+                        
+                    c_datasets.append(random_corrupted_testset)
 
         elif self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
             #c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
+
+            #corruptions_bar = np.asarray(read_corruption_csv(os.path.abspath('../data/imagenet_c_bar.csv')))
+            
             corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-IN.txt'), dtype=list))
             corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
             for corruption, set in corruptions:
-                intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity)),
-                                                                       transform=self.transforms_preprocess) for intensity in range(1, 6)]
-                if subset == True:
-                    selected_indices = np.random.choice(len(intensity_datasets[0]), subsetsize, replace=False)
-                    intensity_datasets = [Subset(intensity_dataset, selected_indices) for intensity_dataset in intensity_datasets]
-                concat_intensities = ConcatDataset(intensity_datasets)
-                c_datasets.append(concat_intensities)
+                
+                if validontest:
+                    intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity)),
+                                                                        transform=self.transforms_preprocess) for intensity in range(1, 6)]
+                    if subset == True:
+                        selected_indices = np.random.choice(len(intensity_datasets[0]), subsetsize, replace=False)
+                        intensity_datasets = [Subset(intensity_dataset, selected_indices) for intensity_dataset in intensity_datasets]
+                    concat_intensities = ConcatDataset(intensity_datasets)
+                    c_datasets.append(concat_intensities)
+                else:
+                    random_corrupted_testset = SubsetWithTransform(self.testset, 
+                                                    transform=RandomCommonCorruptionTransform(set, corruption, self.dataset))
+                    if subset == True:
+                        selected_indices = np.random.choice(10000, subsetsize, replace=False)
+                        random_corrupted_testset = Subset(random_corrupted_testset, selected_indices)
+                        
+                    c_datasets.append(random_corrupted_testset)
         else:
             print('No corrupted benchmark available other than CIFAR10-c, CIFAR100-c, TinyImageNet-c and ImageNet-c.')
             return
@@ -623,6 +708,8 @@ class DataLoading():
             self.c_datasets_dict = {'combined': c_datasets}
         else:
             self.c_datasets_dict = {label: dataset for label, dataset in zip([corr for corr, _ in corruptions], c_datasets)}
+
+
         return self.c_datasets_dict
 
     def get_loader(self, batchsize, number_workers):
@@ -642,9 +729,9 @@ class DataLoading():
                                       num_workers=number_workers, worker_init_fn=seed_worker, 
                                         generator=g, persistent_workers=False)
 
-        self.validationloader = DataLoader(self.validset, batch_size=batchsize, pin_memory=False, num_workers=0)
+        self.testloader = DataLoader(self.testset, batch_size=batchsize, pin_memory=False, num_workers=0)
 
-        return self.trainloader, self.validationloader
+        return self.trainloader, self.testloader
 
     def update_trainset(self, epoch, start_epoch):
 

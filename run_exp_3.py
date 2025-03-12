@@ -7,7 +7,7 @@ torch.cuda.device_count()
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [113,339,340]:
+    for experiment in list(range(144,147)):
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -15,15 +15,14 @@ if __name__ == '__main__':
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
 
         runs = 1
-        run_iter = [0]
-        if experiment in [113,339,340]:
+        run_iter = [0] 
+
+        if experiment in [340]:
             runs = 3
             run_iter =[1,2]
-        if experiment in [339]:
-            run_iter =[2]
 
         for run in run_iter:
-            if experiment in [339] and run in [2]:
+            if experiment in [144] and run in [0]:
                 resume = True
             else:
                 resume = False
@@ -52,13 +51,13 @@ if __name__ == '__main__':
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
         print('Beginning metric evaluation')
-        cmdeval = "python experiments/eval.py --resume={} --experiment={} --runs={} --batchsize={} --dataset={} " \
-                "--modeltype={} --modelparams=\"{}\" --resize={} --combine_test_corruptions={} --number_workers={} " \
-                "--normalize={} --pixel_factor={} --test_on_c={} --calculate_adv_distance={} --adv_distance_params=\"{}\" " \
-                "--calculate_autoattack_robustness={} --autoattack_params=\"{}\" " \
-                .format(resume, experiment, runs, 1000, config.dataset, config.modeltype, config.modelparams,
-                        config.resize, config.combine_test_corruptions, 0, config.normalize,
-                        config.pixel_factor, config.test_on_c, config.calculate_adv_distance, config.adv_distance_params,
-                        config.calculate_autoattack_robustness, config.autoattack_params)
+        cmdeval = f"python experiments/eval.py --resume={resume} --experiment={experiment} --runs={runs} --batchsize={1000} " \
+                f"--dataset={config.dataset} --modeltype={config.modeltype} --modelparams=\"{config.modelparams}\" " \
+                f"--resize={config.resize} --combine_test_corruptions={config.combine_test_corruptions} --number_workers={0} " \
+                f"--normalize={config.normalize} --pixel_factor={config.pixel_factor} --test_on_c={config.test_on_c} " \
+                f"--calculate_adv_distance={config.calculate_adv_distance} --adv_distance_params=\"{config.adv_distance_params}\" " \
+                f"--calculate_autoattack_robustness={config.calculate_autoattack_robustness} --autoattack_params=" \
+                f"\"{config.autoattack_params}\" --validontest={config.validontest}" \
+                
         os.system(cmdeval)
 

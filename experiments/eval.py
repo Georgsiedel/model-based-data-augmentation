@@ -29,6 +29,8 @@ parser.add_argument('--experiment', default=0, type=int,
 parser.add_argument('--batchsize', default=1000, type=int,
                     help='Images per batch - more means quicker training, but higher memory demand')
 parser.add_argument('--dataset', default='CIFAR10', type=str, help='Dataset to choose')
+parser.add_argument('--validontest', type=utils.str2bool, nargs='?', const=True, default=True, help='True: Use full '
+                    'training data and test data. False: 80:20 train:valiation split, validation also used for testing.')
 parser.add_argument('--modeltype', default='wideresnet', type=str,
                     help='Modeltype to train, use either default WRN28 or model from pytorch models')
 parser.add_argument('--modelparams', default={}, type=str, action=utils.str2dictAction, metavar='KEY=VALUE',
@@ -93,14 +95,13 @@ if __name__ == '__main__':
                                 args.calculate_adv_distance, args.calculate_autoattack_robustness,
                                 test_corruptions, args.adv_distance_params)
 
-    # Load data
-    Dataloader = data.DataLoading(dataset=args.dataset, generated_ratio=0.0, resize=args.resize, test_only=True)
-    Dataloader.create_transforms(train_aug_strat_orig='None', train_aug_strat_gen='None')
-    Dataloader.load_base_data(validontest=True)
-    testloader = torch.utils.data.DataLoader(Dataloader.testset, batch_size=args.batchsize, shuffle=False, pin_memory=True,
-                            num_workers=args.number_workers)
-
     for run in range(args.runs):
+        # Load data
+        Dataloader = data.DataLoading(dataset=args.dataset, generated_ratio=0.0, resize=args.resize, run=run)
+        Dataloader.create_transforms(train_aug_strat_orig='None', train_aug_strat_gen='None')
+        Dataloader.load_base_data(validontest=args.validontest, test_only=True)
+        testloader = torch.utils.data.DataLoader(Dataloader.testset, batch_size=args.batchsize, shuffle=False, pin_memory=True,
+                            num_workers=args.number_workers)
             
         Testtracker.initialize(run)
 
@@ -129,7 +130,7 @@ if __name__ == '__main__':
         Testtracker.track_results([acc, rmsce])
 
         if args.test_on_c == True:  # C-dataset robust accuracy
-            testsets_c = Dataloader.load_data_c(subset=False, subsetsize=None)
+            testsets_c = Dataloader.load_data_c(validontest=args.validontest, subset=False, subsetsize=None)
             accs_c = eval_corruptions.compute_c_corruptions(args.dataset, testsets_c, model, args.batchsize,
                                                             Dataloader.num_classes, eval_run=False)
             Testtracker.track_results(accs_c)

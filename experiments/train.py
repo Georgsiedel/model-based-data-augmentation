@@ -16,6 +16,7 @@ import torch.optim as optim
 from torch.optim.swa_utils import AveragedModel, SWALR
 from experiments.utils import plot_images
 import time
+import random
 
 import data
 import utils
@@ -42,8 +43,8 @@ parser.add_argument('--experiment', default=0, type=int,
 parser.add_argument('--batchsize', default=128, type=int,
                     help='Images per batch - more means quicker training, but higher memory demand')
 parser.add_argument('--dataset', default='CIFAR10', type=str, help='Dataset to choose')
-parser.add_argument('--validontest', type=utils.str2bool, nargs='?', const=True, default=True, help='For datasets wihtout '
-                    'standout validation (e.g. CIFAR). True: Use full training data, False: Split 20% for valiationd')
+parser.add_argument('--validontest', type=utils.str2bool, nargs='?', const=True, default=True, help='True: Use full '
+                    'training data and test data. False: 80:20 train:valiation split, validation also used for testing.')
 parser.add_argument('--epochs', default=100, type=int, help="number of epochs")
 parser.add_argument('--learningrate', default=0.1, type=float, help='learning rate')
 parser.add_argument('--lrschedule', default='MultiStepLR', type=str, help='Learning rate scheduler from pytorch.')
@@ -214,13 +215,19 @@ if __name__ == '__main__':
 
     mp.set_start_method('spawn', force=True)
 
+    #this ensures reproducibility for model initialization on same runs. reproducibility for data augmentation and resumed training is ensured in data
+    torch.manual_seed(args.run)
+    torch.cuda.manual_seed(args.run)
+    np.random.seed(args.run)
+    random.seed(args.run)
+
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams
     criterion = losses.Criterion(args.loss, trades_loss=args.trades_loss, robust_loss=args.robust_loss, **lossparams)
 
     Dataloader = data.DataLoading(args.dataset, args.epochs, args.generated_ratio, args.resize, args.run, factor=args.pixel_factor)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
-    Dataloader.load_base_data(args.validontest, args.run)
-    testsets_c = Dataloader.load_data_c(subset=args.validonc, subsetsize=100) if args.validonc else None
+    Dataloader.load_base_data(validontest=args.validontest, test_only=False, run=args.run)
+    testsets_c = Dataloader.load_data_c(validontest=args.validontest, subset=args.validonc, subsetsize=100) if args.validonc else None
 
     # Construct model
     print(f'\nBuilding {args.modeltype} model with {args.modelparams} | Loss Function: {args.loss}, Stability Loss: {args.robust_loss}, Trades Loss: {args.trades_loss}')
@@ -278,37 +285,35 @@ if __name__ == '__main__':
         trainloader, validationloader = Dataloader.get_loader(args.batchsize, args.number_workers)
     
         # Training loop
-        with torch.autograd.set_detect_anomaly(False, check_nan=False): #this may resolve some Cuda/cuDNN errors.
-            # check_nan=True increases 32bit precision train time by ~20% and causes errors due to nan values for mixed precision training.
-            for epoch in range(start_epoch, end_epoch):
+        for epoch in range(start_epoch, end_epoch):
 
-                #get new generated data sample in the trainset
-                trainloader = Dataloader.update_trainset(epoch, start_epoch)
+            #get new generated data sample in the trainset
+            trainloader = Dataloader.update_trainset(epoch, start_epoch)
 
-                train_acc, train_loss = train_epoch(pbar)
-                valid_acc, valid_loss, valid_acc_robust, valid_acc_adv = valid_epoch(pbar, model)
+            train_acc, train_loss = train_epoch(pbar)
+            valid_acc, valid_loss, valid_acc_robust, valid_acc_adv = valid_epoch(pbar, model)
 
-                if args.swa['apply'] == True and (epoch + 1) > swa_start:
-                    swa_model.update_parameters(model)
-                    swa_scheduler.step()
-                    valid_acc_swa, valid_loss_swa, valid_acc_robust_swa, valid_acc_adv_swa = valid_epoch(pbar, swa_model)
+            if args.swa['apply'] == True and (epoch + 1) > swa_start:
+                swa_model.update_parameters(model)
+                swa_scheduler.step()
+                valid_acc_swa, valid_loss_swa, valid_acc_robust_swa, valid_acc_adv_swa = valid_epoch(pbar, swa_model)
+            else:
+                if args.lrschedule == 'ReduceLROnPlateau':
+                    scheduler.step(valid_loss)
                 else:
-                    if args.lrschedule == 'ReduceLROnPlateau':
-                        scheduler.step(valid_loss)
-                    else:
-                        scheduler.step()
-                    valid_acc_swa, valid_acc_robust_swa, valid_acc_adv_swa = valid_acc, valid_acc_robust, valid_acc_adv
+                    scheduler.step()
+                valid_acc_swa, valid_acc_robust_swa, valid_acc_adv_swa = valid_acc, valid_acc_robust, valid_acc_adv
 
-                # Check for best model, save model(s) and learning curve and check for earlystopping conditions
-                elapsed_time = time.time() - training_start_time
-                Checkpointer.earlystopping(valid_acc)
-                Checkpointer.save_checkpoint(model, swa_model, optimizer, scheduler, swa_scheduler, epoch)
-                Traintracker.save_metrics(elapsed_time, train_acc, valid_acc, valid_acc_robust, valid_acc_adv, valid_acc_swa,
-                             valid_acc_robust_swa, valid_acc_adv_swa, train_loss, valid_loss)
-                Traintracker.save_learning_curves()
-                if Checkpointer.early_stop:
-                    end_epoch = epoch
-                    break
+            # Check for best model, save model(s) and learning curve and check for earlystopping conditions
+            elapsed_time = time.time() - training_start_time
+            Checkpointer.earlystopping(valid_acc)
+            Checkpointer.save_checkpoint(model, swa_model, optimizer, scheduler, swa_scheduler, epoch)
+            Traintracker.save_metrics(elapsed_time, train_acc, valid_acc, valid_acc_robust, valid_acc_adv, valid_acc_swa,
+                            valid_acc_robust_swa, valid_acc_adv_swa, train_loss, valid_loss)
+            Traintracker.save_learning_curves()
+            if Checkpointer.early_stop:
+                end_epoch = epoch
+                break
 
     # Save final model
     if args.swa['apply'] == True:
