@@ -33,7 +33,7 @@ transform_list = [
 
 transform_dict = {t.name : t for t in transform_list}
 
-def build_transform(name, severity, dataset):
+def build_transform_c_bar(name, severity, dataset):
     assert dataset in ['CIFAR10', 'CIFAR100', 'ImageNet', 'TinyImageNet'],\
             "Only cifar and imagenet image resolutions are supported."
     if dataset in ['CIFAR10', 'CIFAR100']: 
