@@ -29,6 +29,8 @@ WORKDIR /workspace
 
 # Install Python dependencies (requirements.txt should be in your repo)
 COPY requirements.txt /workspace/
+RUN apt-get update && apt-get install -y libgl1-mesa-glx
+RUN apt-get update && apt-get install -y libglib2.0-0
 RUN pip install -r /workspace/requirements.txt
 
 # Copy your repository code into the container
