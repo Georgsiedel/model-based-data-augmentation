@@ -226,7 +226,7 @@ if __name__ == '__main__':
 
     Dataloader = data.DataLoading(args.dataset, args.epochs, args.generated_ratio, args.resize, args.run, factor=args.pixel_factor)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
-    Dataloader.load_base_data(validontest=args.validontest, test_only=False, run=args.run)
+    Dataloader.load_base_data(validontest=args.validontest, test_only=False)
     testsets_c = Dataloader.load_data_c(validontest=args.validontest, subset=args.validonc, subsetsize=100) if args.validonc else None
 
     # Construct model

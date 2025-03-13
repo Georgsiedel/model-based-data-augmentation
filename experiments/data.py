@@ -15,8 +15,8 @@ import numpy as np
 import experiments.custom_transforms as custom_transforms
 from run_exp import device
 from experiments.utils import plot_images
-import imagecorruptions
-from experiments.utils import build_transform_c_bar
+#import imagecorruptions
+#from experiments.utils import build_transform_c_bar
 
 def normalization_values(batch, dataset, normalized, manifold=False, manifold_factor=1):
 
@@ -156,15 +156,15 @@ class SubsetWithTransform(Dataset):
         return image, label
 
 class CustomDataset(Dataset):
-    def __init__(self, np_images, testlabels, resize, preprocessing):
+    def __init__(self, np_images, testset, resize, preprocessing):
         # Load images
         self.np_images = np.memmap(np_images, dtype=np.float32, mode='r') if isinstance(np_images, str) else np_images
         self.resize = resize
         self.preprocessing = preprocessing
-        self.labels = testlabels
+        self.set = testset
 
     def __len__(self):
-        return len(self.labels)
+        return len(self.set)
 
     def __getitem__(self, index):
         # Get image and label for the given index
@@ -172,7 +172,7 @@ class CustomDataset(Dataset):
         if self.resize == True:
             image = transforms.Resize(224, antialias=True)(image)
 
-        label = self.labels[index]
+        _, label = self.set[index]
 
         return image, label
     
@@ -209,32 +209,32 @@ class NumpyToPil(object):
     def __call__(self, image):
         return Image.fromarray(image)
 
-class RandomCommonCorruptionTransform:
-    def __init__(self, set, corruption_name, dataset):
-        self.corruption_name = corruption_name
-        self.set = set
-        self.dataset = dataset
-        self.TtoPIL = transforms.ToPILImage()
-        self.PILtoNP = PilToNumpy()
-        self.NPtoPIL = NumpyToPil()
-        self.ToTensor = transforms.ToTensor()
-
-    def __call__(self, img):
-        severity = random.randint(1, 5)
-
-        if self.set == 'c':
-            img_np = self.PILtoNP(self.TtoPIL(img))
-            corrupted_img = self.ToTensor(self.NPtoPIL(imagecorruptions.corrupt(img_np, self.corruption_name, severity)))
-        elif self.set == 'c-bar':
-            comp = transforms.compose([self.TtoPIL,
-                                self.PILtoNP,
-                build_transform_c_bar(self.corruption_name, severity, self.dataset),
-                self.NPtoPIL,
-                self.ToTensor
-                ])
-            corrupted_img = comp(img)
-
-        return corrupted_img
+#class RandomCommonCorruptionTransform:
+#    def __init__(self, set, corruption_name, dataset):
+#        self.corruption_name = corruption_name
+#        self.set = set
+#        self.dataset = dataset
+#        self.TtoPIL = transforms.ToPILImage()
+#        self.PILtoNP = PilToNumpy()
+#        self.NPtoPIL = NumpyToPil()
+#        self.ToTensor = transforms.ToTensor()
+#
+#    def __call__(self, img):
+#        severity = random.randint(1, 5)
+#
+#        if self.set == 'c':
+#            img_np = self.PILtoNP(self.TtoPIL(img))
+#            corrupted_img = self.ToTensor(self.NPtoPIL(imagecorruptions.corrupt(img_np, self.corruption_name, severity)))
+#        elif self.set == 'c-bar':
+#            comp = transforms.compose([self.TtoPIL,
+#                                self.PILtoNP,
+#                build_transform_c_bar(self.corruption_name, severity, self.dataset),
+#                self.NPtoPIL,
+#                self.ToTensor
+#                ])
+#            corrupted_img = comp(img)
+#
+#        return corrupted_img
 
 class GroupedBalancedRatioSampler(Sampler):
     def __init__(self, dataset, generated_ratio, batch_size, group_size=32):
@@ -555,6 +555,8 @@ class DataLoading():
                 
             else:
                 print('Dataset not loadable')
+            
+            self.num_classes = len(self.testset.classes)
         
         else:
             if self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
@@ -574,10 +576,12 @@ class DataLoading():
                 random_state=self.run)  # same validation split for same runs, but new validation on multiple runs
             self.base_trainset = Subset(base_trainset, train_indices)
             validset = Subset(base_trainset, val_indices)
+
             self.testset = [(self.transforms_preprocess(data), target) for data, target in validset]
                 
-        self.num_classes = len(self.testset.classes)
+            self.num_classes = len(base_trainset.classes)
     
+
     def load_augmented_traindata(self, target_size, epoch=0, robust_samples=0):
         self.robust_samples = robust_samples
         self.target_size = target_size
@@ -649,30 +653,29 @@ class DataLoading():
 
             corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-cifar.txt'), dtype=list))
             corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
-            testlabels = [label for _, label in self.testset]
-
+            
             for corruption, set in corruptions:
 
-                if validontest:
-                    subtestlabels = testlabels
-                    np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'), mmap_mode='r')
-                    np_data_c = np.array(np.array_split(np_data_c, 5))
+                #if validontest:
+                subtestset = self.testset
+                np_data_c = np.load(os.path.abspath(f'../data/{self.dataset}-{set}/{corruption}.npy'), mmap_mode='r')
+                np_data_c = np.array(np.array_split(np_data_c, 5))
 
-                    if subset == True:
-                        selected_indices = np.random.choice(10000, subsetsize, replace=False)
-                        subtestlabels = testlabels[selected_indices]
-                        np_data_c = [intensity_dataset[selected_indices] for intensity_dataset in np_data_c]
-                    concat_intensities = ConcatDataset([CustomDataset(intensity_data_c, subtestlabels, self.resize, self.transforms_preprocess) for intensity_data_c in np_data_c])
-                    c_datasets.append(concat_intensities)
+                if subset == True:
+                    selected_indices = np.random.choice(len(self.testset), subsetsize, replace=False)
+                    subtestset = Subset(self.testset, selected_indices)
+                    np_data_c = [intensity_dataset[selected_indices] for intensity_dataset in np_data_c]
+                concat_intensities = ConcatDataset([CustomDataset(intensity_data_c, subtestset, self.resize, self.transforms_preprocess) for intensity_data_c in np_data_c])
+                c_datasets.append(concat_intensities)
 
-                else:
-                    random_corrupted_testset = SubsetWithTransform(self.testset, 
-                                                    transform=RandomCommonCorruptionTransform(set, corruption, self.dataset))
-                    if subset == True:
-                        selected_indices = np.random.choice(10000, subsetsize, replace=False)
-                        random_corrupted_testset = Subset(random_corrupted_testset, selected_indices)
-                        
-                    c_datasets.append(random_corrupted_testset)
+                #else:
+                #    random_corrupted_testset = SubsetWithTransform(self.testset, 
+                #                                    transform=RandomCommonCorruptionTransform(set, corruption, self.dataset))
+                #    if subset == True:
+                #        selected_indices = np.random.choice(len(self.testset), subsetsize, replace=False)
+                #        random_corrupted_testset = Subset(random_corrupted_testset, selected_indices)
+                #        
+                #    c_datasets.append(random_corrupted_testset)
 
         elif self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
             #c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
@@ -681,24 +684,25 @@ class DataLoading():
             
             corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-IN.txt'), dtype=list))
             corruptions = [(string, 'c') for string in corruptions_c] + [(string, 'c-bar') for string in corruptions_bar]
+            
             for corruption, set in corruptions:
                 
-                if validontest:
-                    intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity)),
-                                                                        transform=self.transforms_preprocess) for intensity in range(1, 6)]
-                    if subset == True:
-                        selected_indices = np.random.choice(len(intensity_datasets[0]), subsetsize, replace=False)
-                        intensity_datasets = [Subset(intensity_dataset, selected_indices) for intensity_dataset in intensity_datasets]
-                    concat_intensities = ConcatDataset(intensity_datasets)
-                    c_datasets.append(concat_intensities)
-                else:
-                    random_corrupted_testset = SubsetWithTransform(self.testset, 
-                                                    transform=RandomCommonCorruptionTransform(set, corruption, self.dataset))
-                    if subset == True:
-                        selected_indices = np.random.choice(10000, subsetsize, replace=False)
-                        random_corrupted_testset = Subset(random_corrupted_testset, selected_indices)
-                        
-                    c_datasets.append(random_corrupted_testset)
+                #if validontest:
+                intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity)),
+                                                                    transform=self.transforms_preprocess) for intensity in range(1, 6)]
+                if subset == True:
+                    selected_indices = np.random.choice(len(intensity_datasets[0]), subsetsize, replace=False)
+                    intensity_datasets = [Subset(intensity_dataset, selected_indices) for intensity_dataset in intensity_datasets]
+                concat_intensities = ConcatDataset(intensity_datasets)
+                c_datasets.append(concat_intensities)
+                #else:
+                #    random_corrupted_testset = SubsetWithTransform(self.testset, 
+                #                                    transform=RandomCommonCorruptionTransform(set, corruption, self.dataset))
+                #    if subset == True:
+                #        selected_indices = np.random.choice(len(self.testset), subsetsize, replace=False)
+                #        random_corrupted_testset = Subset(random_corrupted_testset, selected_indices)
+                #        
+                #    c_datasets.append(random_corrupted_testset)
         else:
             print('No corrupted benchmark available other than CIFAR10-c, CIFAR100-c, TinyImageNet-c and ImageNet-c.')
             return

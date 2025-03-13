@@ -1,0 +1,30 @@
+{
+	"name": "Python 3.11 CUDA 12.4.1 Devcontainer",
+	"build": {
+	  "dockerfile": "Dockerfile",
+	  "context": "."
+	},
+	"settings": {
+	  "terminal.integrated.defaultProfile.linux": "bash",
+	  "python.defaultInterpreterPath": "/opt/venv/bin/python3.11"
+	},
+	"mounts": [
+	  {
+		"type": "bind",
+		"source": "/home/siedel/data",
+		"target": "/workspaces/data"
+	  },
+	  {
+		"type": "bind",
+		"source": "/home/siedel/trained_models",
+		"target": "/workspaces/trained_models"
+	  }
+	],
+	"postCreateCommand": "pip3 install --user -r requirements.txt",
+	"containerEnv": {
+	  "CUDA_HOME": "/usr/local/cuda",
+	  "LD_LIBRARY_PATH": "/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
+	},
+	"remoteUser": "root"
+  }
+  
