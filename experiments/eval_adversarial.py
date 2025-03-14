@@ -12,7 +12,6 @@ from art.attacks.evasion import (ProjectedGradientDescentPyTorch,
 from art.metrics import clever_u
 from cleverhans.torch.utils import optimize_linear
 
-
 def fast_gradient_validation(model_fn, x, eps, norm, criterion, clip_min=None, clip_max=None, y=None, targeted=False,
     sanity_checks=False):
 
