@@ -7,14 +7,17 @@ import torchvision.transforms.v2 as transforms_v2
 import torchvision.transforms as transforms
 from run_exp import device
 import gc
-
+import imagecorruptions
+import experiments.eval_corruption_transforms as c
 import torch
 from torchvision.transforms import ToTensor, ToPILImage
+from PIL import Image
 import numpy as np
 import time
 from experiments.utils import plot_images
 import experiments.style_transfer as style_transfer
 from experiments.data import StylizedTensorDataset
+
 
 def get_transforms_map(strat_name, re, dataset, factor):
     TAc = CustomTA_color()
@@ -324,6 +327,180 @@ def get_transforms_map(strat_name, re, dataset, factor):
     else transform_not_found(strat_name))
 
     return transforms_stylization, transforms_after_style, transforms_after_nostyle
+
+
+class PilToNumpy(object):
+    def __init__(self, as_float=False, scaled_to_one=False):
+        self.as_float = as_float
+        self.scaled_to_one = scaled_to_one
+        assert (not scaled_to_one) or (as_float and scaled_to_one),\
+                "Must output a float if rescaling to one."
+
+    def __call__(self, image):
+        if not self.as_float:
+            return np.array(image).astype(np.uint8)
+        elif not self.scaled_to_one:
+            return np.array(image).astype(np.float32)
+        else:
+            return np.array(image).astype(np.float32) / 255
+
+class NumpyToPil(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, image):
+        return Image.fromarray(image)
+
+def build_transform_c_bar(name, severity, dataset):
+    assert dataset in ['CIFAR10', 'CIFAR100', 'ImageNet', 'TinyImageNet'],\
+            "Only cifar and imagenet image resolutions are supported."
+    
+    if dataset in ['CIFAR10', 'CIFAR100']: 
+        im_size = 32
+    elif dataset in ['TinyImageNet']: 
+        im_size = 64
+    else:
+        im_size = 224
+
+    transform_c_bar_list = [
+    c.SingleFrequencyGreyscale,
+    c.CocentricSineWaves,
+    c.PlasmaNoise,
+    c.CausticNoise,
+    c.PerlinNoise,
+    c.BlueNoise,
+    c.BrownishNoise,
+    c.TransverseChromaticAbberation,
+    c.CircularMotionBlur,
+    c.CheckerBoardCutOut,
+    c.Sparkles,
+    c.InverseSparkles,
+    c.Lines,
+    c.BlueNoiseSample,
+    c.PinchAndTwirl,
+    c.CausticRefraction,
+    c.Ripple
+    ]   
+
+    transform_c_bar_dict = {t.name : t for t in transform_c_bar_list}
+    
+    return transform_c_bar_dict[name](severity=severity, im_size=im_size)
+
+
+def transform_c(image, severity=1, corruption_name=None, corruption_number=-1):
+    """This function returns a corrupted version of the given image.
+    
+    Args:
+        image (numpy.ndarray):      image to corrupt; a numpy array in [0, 255], expected datatype is np.uint8
+                                    expected shape is either (height x width x channels) or (height x width); 
+                                    width and height must be at least 32 pixels;
+                                    channels must be 1 or 3;
+        severity (int):             strength with which to corrupt the image; an integer in [1, 5]
+        corruption_name (str):      specifies which corruption function to call, must be one of
+                                        'gaussian_noise', 'shot_noise', 'impulse_noise', 'defocus_blur',
+                                        'glass_blur', 'motion_blur', 'zoom_blur', 'snow', 'frost', 'fog',
+                                        'brightness', 'contrast', 'elastic_transform', 'pixelate', 'jpeg_compression',
+                                        'speckle_noise', 'gaussian_blur', 'spatter', 'saturate';
+                                    the last four are validation corruptions
+        corruption_number (int):    the position of the corruption_name in the above list; an integer in [0, 18]; 
+                                        useful for easy looping; 15, 16, 17, 18 are validation corruption numbers
+    Returns:
+        numpy.ndarray:              the image corrupted by a corruption function at the given severity; same shape as input
+    """
+    corruption_tuple = (c.gaussian_noise, 
+                        c.shot_noise, 
+                        c.impulse_noise, 
+                        c.defocus_blur,
+                        c.glass_blur, 
+                        c.motion_blur, 
+                        c.zoom_blur, 
+                        c.snow, 
+                        c.frost, 
+                        c.fog,
+                        c.brightness, 
+                        c.contrast, 
+                        c.elastic_transform, 
+                        c.pixelate,
+                        c.jpeg_compression, 
+                        c.speckle_noise, 
+                        c.gaussian_blur, 
+                        c.spatter,
+                        c.saturate)
+
+    corruption_dict = {corr_func.__name__: corr_func for corr_func in
+                   corruption_tuple}
+
+    if not isinstance(image, np.ndarray):
+        raise AttributeError('Expecting type(image) to be numpy.ndarray')
+    if not (image.dtype.type is np.uint8):
+        raise AttributeError('Expecting image.dtype.type to be numpy.uint8')
+        
+    if not (image.ndim in [2,3]):
+        raise AttributeError('Expecting image.shape to be either (height x width) or (height x width x channels)')
+    if image.ndim == 2:
+        image = np.stack((image,)*3, axis=-1)
+    
+    height, width, channels = image.shape
+
+    if height == 32:
+        scale = 'cifar'
+    elif height <= 64:
+        scale = 'tin'
+    else: 
+        scale = 'in'
+    
+    if (height < 32 or width < 32):
+        raise AttributeError('Image width and height must be at least 32 pixels')
+    
+    if not (channels in [1,3]):
+        raise AttributeError('Expecting image to have either 1 or 3 channels (last dimension)')
+        
+    if channels == 1:
+        image = np.stack((np.squeeze(image),)*3, axis=-1)
+    
+    if not severity in [1,2,3,4,5]:
+        raise AttributeError('Severity must be an integer in [1, 5]')
+    
+    if not (corruption_name is None):
+        image_corrupted = corruption_dict[corruption_name](Image.fromarray(image),
+                                                       severity, scale)
+    elif corruption_number != -1:
+        image_corrupted = corruption_tuple[corruption_number](Image.fromarray(image),
+                                                          severity, scale)
+    else:
+        raise ValueError("Either corruption_name or corruption_number must be passed")
+
+    return np.uint8(image_corrupted)
+
+class RandomCommonCorruptionTransform:
+    def __init__(self, set, corruption_name, dataset, csv_handler):
+        self.corruption_name = corruption_name
+        self.set = set
+        self.dataset = dataset
+        self.csv_handler = csv_handler
+        self.TtoPIL = transforms.ToPILImage()
+        self.PILtoNP = PilToNumpy()
+        self.NPtoPIL = NumpyToPil()
+        self.ToTensor = transforms.ToTensor()
+
+    def __call__(self, img):
+        severity = random.randint(1, 5)
+
+        if self.set == 'c':
+            img_np = self.PILtoNP(self.TtoPIL(img))
+            corrupted_img = self.ToTensor(self.NPtoPIL(transform_c(img_np, severity=severity, corruption_name=self.corruption_name)))
+        elif self.set == 'c-bar':
+            severity_value = self.csv_handler.get_value(self.corruption_name, severity)
+            
+            comp = transforms.Compose([self.TtoPIL,
+                                self.PILtoNP,
+                build_transform_c_bar(self.corruption_name, severity_value, self.dataset),
+                self.NPtoPIL,
+                self.ToTensor
+                ])
+            corrupted_img = comp(img)
+
+        return corrupted_img
 
 class DatasetStyleTransforms:
     def __init__(self, transform_style, batch_size, stylized_ratio):

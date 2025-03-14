@@ -18,7 +18,6 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError(f'Error: Boolean value expected for argument {v}.')
 
-
 class str2dictAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         # Parse the dictionary string into a dictionary object
@@ -33,10 +32,6 @@ class str2dictAction(argparse.Action):
 
         setattr(namespace, self.dest, dictionary)
 
-
-
-import matplotlib.pyplot as plt
-import torch
 
 def plot_images(number, mean, std, images, corrupted_images = None, second_corrupted_images = None):
     images = images * std + mean
@@ -124,6 +119,34 @@ def calculate_steps(dataset, batchsize, epochs, start_epoch, warmupepochs, valid
     total_steps = int(total_trainsteps+total_validsteps)
     start_steps = int(start_trainsteps+start_validsteps)
     return total_steps, start_steps
+
+class CsvHandler:
+    def __init__(self, filename):
+        self.filename = filename
+        # Load the CSV with no header, so the first row is treated as data
+        self.df = pd.read_csv(filename, header=None)
+        # Rename the first column to 'corruption_name' for consistency
+        self.df.rename(columns={self.df.columns[0]: 'corruption_name'}, inplace=True)
+    
+    def read_corruptions(self):
+        """Reads the corruption data from CSV and returns a list of corruption names."""
+        # Return the list of corruption names from the first column
+        return self.df['corruption_name'].tolist()
+    
+    def get_value(self, corruption_name, severity):
+        """Returns the float value from the row with the corruption_name and severity."""
+        try:
+            # Convert severity to a string because column names are likely strings
+            if corruption_name in self.df['corruption_name'].values:
+                # Retrieve the value from the DataFrame
+                value = self.df.loc[self.df['corruption_name'] == corruption_name, severity].values[0]
+                return float(value)
+            else:
+                return None
+            
+        except KeyError:
+            return None
+
 
 class Checkpoint:
     """Early stops the training if validation loss doesn't improve after a given patience.
