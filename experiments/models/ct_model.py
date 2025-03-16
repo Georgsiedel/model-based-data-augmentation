@@ -96,12 +96,18 @@ class CtModel(nn.Module):
             style_feats = self.blocks[0](style_feats)
         prob = torch.rand(1).item()
         for i, ResidualBlock in enumerate(self.blocks[1:]):
-            out = ResidualBlock(out)
             if style_norm_type == "pono":
                 if prob < int_adain_probability and i == 0:
                     out = self.internal_adain(out, style_feats)
                     print("[TEST] PoNo Applied")
-
+            out = ResidualBlock(out)
+            # TODO: Add Moment Exchange
+            if style_norm_type == "int_adain":
+                if prob < int_adain_probability and i == 0:
+                    # style_feats = self.blocks[0](style_feats)
+                    style_feats = ResidualBlock(style_feats)
+                    out = self.internal_adain(out, style_feats)
+                    print("[TEST] Internal AdaIN applied")
             if k == (i + 1):  # Do manifold mixup if k is greater 0
                 out, targets = mixup_process(
                     out,
@@ -125,12 +131,6 @@ class CtModel(nn.Module):
                     l0_level=0.0,
                 )
 
-            if style_norm_type == "int_adain":
-                if prob < int_adain_probability and i == 0:
-                    # style_feats = self.blocks[0](style_feats)
-                    style_feats = ResidualBlock(style_feats)
-                    out = self.internal_adain(out, style_feats)
-                    print("[TEST] Internal AdaIN applied")
         return out, targets
 
     def _calc_mean_std(self, feat, eps=1e-5):

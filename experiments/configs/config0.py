@@ -50,7 +50,7 @@ minibatchsize = 8
 dataset = "TinyImageNet"  # ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
 generated_ratio = 0.5
 normalize = True
-validontest = True
+validontest = True # If True, the model is validated on the validation set. True for final validation. False for hyperparameter tuning.
 validonc = True
 validonadv = False
 lrschedule = "CosineAnnealingWarmRestarts"
@@ -74,10 +74,10 @@ train_aug_strat_orig = "None"  # TrivialAugmentWide, RandAugment, AutoAugment, A
 train_aug_strat_gen = "None"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 aug_strat_check = True
 train_aug_strat_orig = (
-    "TAorStyle0.1"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+    "TrivialAugmentWide"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 )
 train_aug_strat_gen = (
-    "TAorStyle0.5"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+   "TrivialAugmentWide"   # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 )
 loss = "CrossEntropyLoss"
 lossparams = {"label_smoothing": 0.1}
