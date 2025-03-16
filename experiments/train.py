@@ -114,6 +114,14 @@ parser.add_argument('--noise_patch_scale', default={'lower': 0.3, 'upper': 1.0},
                     'gets perturbed by random noise')
 parser.add_argument('--generated_ratio', default=0.0, type=float, help='ratio of synthetically generated images mixed '
                     'into every training batch')
+parser.add_argument(
+    "--int_adain_params",
+    default={},
+    type=str,
+    action=utils.str2dictAction,
+    metavar="KEY=VALUE",
+    help="parameters for the chosen model",
+)
 
 args = parser.parse_args()
 configname = (f'experiments.configs.config{args.experiment}')
@@ -124,6 +132,10 @@ def train_epoch(pbar):
 
     model.train()
     correct, total, train_loss, avg_train_loss = 0, 0, 0, 0
+
+    if style_dataloader:
+        style_iter = iter(style_dataloader)
+
     for batch_idx, (inputs, targets) in enumerate(trainloader):
 
         optimizer.zero_grad()
@@ -131,12 +143,29 @@ def train_epoch(pbar):
             inputs = torch.cat(inputs, 0)
         
         inputs, targets = inputs.to(device, dtype=torch.float32), targets.to(device)
+        if style_dataloader:
+            try:
+                style_feats = next(style_iter)
+                style_feats = style_feats.to(device, dtype=torch.float32)
+            except StopIteration:
+                style_iter = iter(style_dataloader)
+                style_feats = next(style_iter)
+                style_feats = style_feats.to(device, dtype=torch.float32)
+
+            content_batch_size = inputs.size(0)
+            style_batch_size = style_feats.size(0)
+
+            if content_batch_size != style_batch_size:
+                style_feats = style_feats[:content_batch_size]
+
+        else:
+            style_feats = None
         with torch.amp.autocast(device_type=device):
             outputs, mixed_targets = model(inputs, targets, criterion.robust_samples, train_corruptions, args.mixup['alpha'],
                                            args.mixup['p'], args.manifold['apply'], args.manifold['noise_factor'],
                                            args.cutmix['alpha'], args.cutmix['p'], args.minibatchsize,
                                            args.concurrent_combinations, args.noise_sparsity, args.noise_patch_scale['lower'],
-                                           args.noise_patch_scale['upper'], Dataloader.generated_ratio)
+                                           args.noise_patch_scale['upper'], Dataloader.generated_ratio, style_feats=style_feats, **args.int_adain_params)
             criterion.update(model, optimizer)
             loss = criterion(outputs, mixed_targets, inputs, targets)
         loss.retain_grad()
@@ -283,6 +312,11 @@ if __name__ == '__main__':
                                             epoch=start_epoch,
                                             robust_samples=criterion.robust_samples)
         trainloader, validationloader = Dataloader.get_loader(args.batchsize, args.number_workers)
+
+        if style_dir := args.int_adain_params.get("style_dir", None):
+            style_dataloader = Dataloader.load_style_dataloader(
+                style_dir=style_dir, batch_size=args.batchsize
+            )
     
         # Training loop
         for epoch in range(start_epoch, end_epoch):
