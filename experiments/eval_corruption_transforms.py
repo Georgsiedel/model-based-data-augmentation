@@ -767,7 +767,7 @@ class Transform(abc.ABC):
                 data = data.astype(v.dtype)
                 param_signature[k] = data.reshape(v.shape)
                 offset += num
-            elif is_iterable(v):
+            elif self.is_iterable(v):
                 data = []
                 for x in v:
                     if type(x) == 'int':
@@ -821,7 +821,8 @@ class PerlinNoiseGenerator(object):
         N = 16*256
 
         def normalize(arr):
-            return arr / np.linalg.norm(arr)
+            norm = np.linalg.norm(arr)
+            return arr / norm if norm > 0 else np.zeros_like(arr)
 
         self.p = np.arange(2*B+2)
         self.g = np.array([normalize((random_state.randint(low=0, high=2**31, size=2) % (2*B) - B )/ B)\

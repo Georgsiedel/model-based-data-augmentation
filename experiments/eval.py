@@ -97,11 +97,11 @@ if __name__ == '__main__':
 
     for run in range(args.runs):
         # Load data
-        Dataloader = data.DataLoading(dataset=args.dataset, generated_ratio=0.0, resize=args.resize, run=run)
+        Dataloader = data.DataLoading(dataset=args.dataset, validontest=args.validontest, generated_ratio=0.0, resize=args.resize, run=run)
         Dataloader.create_transforms(train_aug_strat_orig='None', train_aug_strat_gen='None')
-        Dataloader.load_base_data(validontest=args.validontest, test_only=True)
-        testloader = torch.utils.data.DataLoader(Dataloader.testset, batch_size=args.batchsize, shuffle=False, pin_memory=True,
-                            num_workers=args.number_workers)
+        Dataloader.load_base_data(test_only=True)
+        
+        testloader = torch.utils.data.DataLoader(Dataloader.testset, batch_size=args.batchsize, pin_memory=False, num_workers=0)
             
         Testtracker.initialize(run)
 
@@ -130,9 +130,12 @@ if __name__ == '__main__':
         Testtracker.track_results([acc, rmsce])
 
         if args.test_on_c == True:  # C-dataset robust accuracy
-            testsets_c = Dataloader.load_data_c(validontest=args.validontest, subset=False, subsetsize=None)
+            subset = False if args.validontest else True
+            subsetsize = None if args.validontest else 1000 #subset for quick validation runs
+
+            testsets_c = Dataloader.load_data_c(subset=subset, subsetsize=subsetsize, valid_run=False)
             accs_c = eval_corruptions.compute_c_corruptions(args.dataset, testsets_c, model, args.batchsize,
-                                                            Dataloader.num_classes, eval_run=False)
+                                                            Dataloader.num_classes, valid_run=False)
             Testtracker.track_results(accs_c)
 
         if args.calculate_adv_distance == True:  # adversarial distance calculation
