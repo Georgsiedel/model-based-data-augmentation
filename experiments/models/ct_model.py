@@ -4,7 +4,7 @@ import numpy as np
 from experiments.mixup import mixup_process
 from experiments.noise import apply_noise, noise_up, apply_noise_add_and_mult
 from experiments.data import normalization_values
-import torch
+from experiments.deepaugment_n2n import N2N_DeepAugment
 
 class CtModel(nn.Module):
 
@@ -19,6 +19,8 @@ class CtModel(nn.Module):
             self.register_buffer('mu', self.mean)
             self.register_buffer('sigma', self.std)
 
+        self.deepaugment_instance = None
+
     def forward_normalize(self, x):
         if self.normalized:
             x = (x - self.mu) / self.sigma
@@ -26,7 +28,17 @@ class CtModel(nn.Module):
     
     def noise_mixup(self, out, targets, robust_samples, corruptions, mixup_alpha, mixup_p, cutmix_alpha, cutmix_p, noise_minibatchsize,
                             concurrent_combinations, noise_sparsity, noise_patch_lower_scale, noise_patch_upper_scale,
-                            generated_ratio):
+                            generated_ratio, n2n_deepaugment):
+        
+        #apply deepaugment if True
+        if n2n_deepaugment:
+            if self.deepaugment_instance is None:
+                self.deepaugment_instance = N2N_DeepAugment(batch_size=out.shape[0], 
+                                                            image_size=out.shape[2], 
+                                                            channels=out.shape[1],
+                                                            noisenet_max_eps=0.75, 
+                                                            ratio=0.5)
+            out = self.deepaugment_instance(out)
 
         #define where mixup is applied. k=0 is in the input space, k>0 is in the embedding space (manifold mixup)
         if self.training == False: k = -1
@@ -48,7 +60,17 @@ class CtModel(nn.Module):
     def forward_noise_mixup(self, out, targets, robust_samples, corruptions, mixup_alpha, mixup_p, manifold,
                             manifold_noise_factor, cutmix_alpha, cutmix_p, noise_minibatchsize,
                             concurrent_combinations, noise_sparsity, noise_patch_lower_scale, noise_patch_upper_scale,
-                            generated_ratio):
+                            generated_ratio, n2n_deepaugment):
+        
+        #apply deepaugment if True
+        if n2n_deepaugment:
+            if self.deepaugment_instance is None:
+                self.deepaugment_instance = N2N_DeepAugment(batch_size=out.shape[0], 
+                                                            image_size=out.shape[2], 
+                                                            channels=out.shape[1],
+                                                            noisenet_max_eps=0.75, 
+                                                            ratio=0.5)
+            out = self.deepaugment_instance(out)
 
         #define where mixup is applied. k=0 is in the input space, k>0 is in the embedding space (manifold mixup)
         if self.training == False: k = -1
