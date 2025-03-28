@@ -7,7 +7,7 @@ torch.cuda.device_count()
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [420,393,367,368]:
+    for experiment in [510,367,368,370,371,372,372,376,377,378,379,380,381,382,383,386,387,388]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -17,15 +17,16 @@ if __name__ == '__main__':
         runs = 1
         run_iter = [0] 
 
-        if experiment in [367,368]:
+        if experiment in [368,370,371,372,372,376,377,378,379,380,381,382,383,386,387,388]:
             runs = 3
             run_iter =[1,2]
+        if experiment in [367]:
+            runs = 3
+            run_iter =[2]
 
         for run in run_iter:
-            if experiment in [420] and run in [0]:
-                resume = True
-            else:
-                resume = False
+
+            resume = True if experiment in [510,367] and run in [0,2] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
@@ -45,7 +46,7 @@ if __name__ == '__main__':
                     f" --normalize={config.normalize} --pixel_factor={config.pixel_factor} --minibatchsize=" \
                     f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
-                    f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} "
+                    f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} --n2n_deepaugment={config.n2n_deepaugment}"
             os.system(cmd0)
 
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption

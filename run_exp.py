@@ -1,12 +1,13 @@
 import os
 import torch
+import importlib
+from experiments.utils import build_command_from_config
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == '__main__':
-    import importlib
 
-    for experiment in [321,328,329,330,331,342]:
+    for experiment in [329,330,331,342,416,417,418,419,420,421,422,423]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -16,18 +17,19 @@ if __name__ == '__main__':
         runs = 1
         run_iter = [0]
 
-        if experiment in [321]:
-            runs = 5
-            run_iter =[4]
-        elif experiment in [328,329,330,331,342]:
+        if experiment in [329,330,331,342]:
             runs = 5
             run_iter =[0,1,2,3,4]
+        if experiment in [329]:
+            runs = 5
+            run_iter =[3,4]
+        if experiment in [416,417,418,419,420,421,422,423]:
+            runs = 3
+            run_iter =[1,2]
 
         for run in run_iter:
-            if experiment in [321] and run==4:
-                resume = True
-            else:
-                resume = False
+
+            resume = True if experiment in [] and run == 3 else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
@@ -47,11 +49,11 @@ if __name__ == '__main__':
                     f" --normalize={config.normalize} --pixel_factor={config.pixel_factor} --minibatchsize=" \
                     f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
-                    f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} "
+                    f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} --n2n_deepaugment={config.n2n_deepaugment}"
             os.system(cmd0)
 
-        # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
+        # Calculate accuracy and robustness
         print('Beginning metric evaluation')
         cmdeval = f"python experiments/eval.py --resume={resume} --experiment={experiment} --runs={runs} --batchsize={1000} " \
                 f"--dataset={config.dataset} --modeltype={config.modeltype} --modelparams=\"{config.modelparams}\" " \
@@ -62,4 +64,3 @@ if __name__ == '__main__':
                 f"\"{config.autoattack_params}\" --validontest={config.validontest}" \
 
         os.system(cmdeval)
-

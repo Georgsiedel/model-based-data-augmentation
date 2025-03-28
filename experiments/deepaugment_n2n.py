@@ -29,7 +29,10 @@ class N2N_DeepAugment(nn.Module):
         self.image_size = image_size
         self.channels = channels
         self.noise2net_batch_size = int(batch_size * ratio)
-        self.noise2net = Res2Net(epsilon=0.50, hidden_planes=16, batch_size=self.noise2net_batch_size).train().to(device)
+        epsilon = 0.15 if image_size <= 64 else 0.5
+        smallscale = True if image_size <= 64 else False
+        hidden_planes = 9 if image_size <= 64 else 16
+        self.noise2net = Res2Net(epsilon=epsilon, hidden_planes=hidden_planes, batch_size=self.noise2net_batch_size, smallscale=smallscale).train().to(device)
         self.noisenet_max_eps = noisenet_max_eps
 
     def forward(self, bx):
@@ -56,7 +59,7 @@ class GELU(torch.nn.Module):
         return F.gelu(x)
 
 class Bottle2neck(nn.Module):
-    def __init__(self, inplanes, planes, stride=1, hidden_planes=9, scale = 4, batch_size=5):
+    def __init__(self, inplanes, planes, stride=1, hidden_planes=9, scale = 4, batch_size=5, smallscale=False):
         """ Constructor
         Args:
             inplanes: input channel dimensionality (multiply by batch_size)
@@ -70,6 +73,7 @@ class Bottle2neck(nn.Module):
         width = hidden_planes * batch_size
         self.conv1 = nn.Conv2d(inplanes * batch_size, width*scale, kernel_size=1, bias=False, groups=batch_size)
         self.bn1 = nn.BatchNorm2d(width*scale)
+
         
         if scale == 1:
             self.nums = 1
@@ -80,7 +84,12 @@ class Bottle2neck(nn.Module):
         bns = []
         for i in range(self.nums):
             K = random.choice([1, 3])
-            D = random.choice([1, 2, 3])
+
+            if smallscale:
+                D = random.choice([1, 2])
+            else:
+                D = random.choice([1, 2, 3])
+
             P = int(((K - 1) / 2) * D)
 
             convs.append(nn.Conv2d(width, width, kernel_size=K, stride = stride, padding=P, dilation=D, bias=True, groups=batch_size))
@@ -140,16 +149,17 @@ class Bottle2neck(nn.Module):
         return out
 
 class Res2Net(torch.nn.Module):
-    def __init__(self, epsilon=0.2, hidden_planes=16, batch_size=5):
+    def __init__(self, epsilon=0.2, hidden_planes=16, batch_size=5, smallscale=False):
         super(Res2Net, self).__init__()
         
         self.epsilon = epsilon
         self.hidden_planes = hidden_planes
+        self.smallscale = smallscale
                 
-        self.block1 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size)
-        self.block2 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size)
-        self.block3 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size)
-        self.block4 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size)
+        self.block1 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size, smallscale=self.smallscale)
+        self.block2 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size, smallscale=self.smallscale)
+        self.block3 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size, smallscale=self.smallscale)
+        self.block4 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size, smallscale=self.smallscale)
 
     def reload_parameters(self):
         for layer in self.modules():

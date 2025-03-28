@@ -36,7 +36,7 @@ class CtModel(nn.Module):
                 self.deepaugment_instance = N2N_DeepAugment(batch_size=out.shape[0], 
                                                             image_size=out.shape[2], 
                                                             channels=out.shape[1],
-                                                            noisenet_max_eps=0.75, 
+                                                            noisenet_max_eps=0.3, 
                                                             ratio=0.5)
             out = self.deepaugment_instance(out)
 
@@ -68,7 +68,7 @@ class CtModel(nn.Module):
                 self.deepaugment_instance = N2N_DeepAugment(batch_size=out.shape[0], 
                                                             image_size=out.shape[2], 
                                                             channels=out.shape[1],
-                                                            noisenet_max_eps=0.75, 
+                                                            noisenet_max_eps=0.3, 
                                                             ratio=0.5)
             out = self.deepaugment_instance(out)
 

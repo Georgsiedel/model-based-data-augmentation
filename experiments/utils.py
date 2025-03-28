@@ -32,6 +32,52 @@ class str2dictAction(argparse.Action):
 
         setattr(namespace, self.dest, dictionary)
 
+def build_command_from_config(config_module, additional_params, base_cmd):
+    """
+    Build a command string from a config module and additional parameters.
+    For dictionary parameters, we convert them to a string with double quotes,
+    so that your custom argparse action (str2dictAction) can parse them correctly.
+    """
+    cmd_parts = [base_cmd]
+
+    # Add parameters from the config module.
+    for key in dir(config_module):
+        if key.startswith("__"):
+            continue  # skip built-in attributes
+        value = getattr(config_module, key)
+        if value is None:
+            continue  # skip undefined values
+        # If the parameter was already provided in additional_params, skip it.
+        if key in additional_params:
+            continue
+
+        if isinstance(value, dict):
+            # Convert dict to string with double quotes.
+            value_str = str(value).replace("'", '"')
+            cmd_parts.append(f'--{key}=\\"{value_str}\\"')
+        elif isinstance(value, str):
+            # Wrap strings in quotes if they contain spaces or quotes.
+            if " " in value or any(c in value for c in ['"', "'"]):
+                cmd_parts.append(f'--{key}="{value}"')
+            else:
+                cmd_parts.append(f'--{key}={value}')
+        else:
+            cmd_parts.append(f'--{key}={value}')
+
+    # Append additional parameters.
+    for key, value in additional_params.items():
+        if isinstance(value, dict):
+            value_str = str(value).replace("'", '"')
+            cmd_parts.append(f'--{key}=\\"{value_str}\\"')
+        elif isinstance(value, str):
+            if " " in value or any(c in value for c in ['"', "'"]):
+                cmd_parts.append(f'--{key}="{value}"')
+            else:
+                cmd_parts.append(f'--{key}={value}')
+        else:
+            cmd_parts.append(f'--{key}={value}')
+
+    return " ".join(cmd_parts)
 
 def plot_images(number, mean, std, images, corrupted_images = None, second_corrupted_images = None):
     images = images * std + mean
@@ -206,10 +252,12 @@ class Checkpoint:
     def load_model(self, model, swa_model, optimizer, scheduler, swa_scheduler, type='standard'):
         checkpoint = torch.load(self.checkpoint_path, weights_only=False)
         if type == 'standard':
-            model.load_state_dict(checkpoint['model_state_dict'], strict=True)
+            filtered_state_dict = {k: v for k, v in checkpoint["model_state_dict"].items() if "deepaugment_instance" not in k}
+            model.load_state_dict(filtered_state_dict, strict=True)
             start_epoch = checkpoint['epoch'] + 1
         elif type == 'best':
-            model.load_state_dict(checkpoint['best_model_state_dict'], strict=True)
+            filtered_state_dict = {k: v for k, v in checkpoint["best_model_state_dict"].items() if "deepaugment_instance" not in k}
+            model.load_state_dict(filtered_state_dict, strict=True)
             start_epoch = checkpoint['best_epoch'] + 1
         else:
             print('only best_checkpoint or checkpoint can be loaded')
@@ -218,7 +266,8 @@ class Checkpoint:
         scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
         if swa_model != None:
-            swa_model.load_state_dict(checkpoint['swa_model_state_dict'], strict=True)
+            swa_filtered_state_dict = {k: v for k, v in checkpoint["swa_model_state_dict"].items() if "deepaugment_instance" not in k}
+            swa_model.load_state_dict(swa_filtered_state_dict, strict=True)
             swa_scheduler.load_state_dict(checkpoint['swa_scheduler_state_dict'])
 
         return start_epoch, model, swa_model, optimizer, scheduler, swa_scheduler

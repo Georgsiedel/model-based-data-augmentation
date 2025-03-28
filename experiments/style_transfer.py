@@ -1,7 +1,6 @@
 import os
 import sys
 import numpy as np
-from experiments.utils import plot_images
 
 current_dir = os.path.dirname(__file__)
 module_path = os.path.abspath(current_dir)

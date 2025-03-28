@@ -27,6 +27,7 @@ from eval_adversarial import fast_gradient_validation
 
 import torch.backends.cudnn as cudnn
 from run_exp import device
+
 if torch.cuda.is_available():
     cudnn.benchmark = False #this slightly speeds up 32bit precision training (5%). False helps achieve reproducibility
     cudnn.deterministic = True
@@ -114,6 +115,8 @@ parser.add_argument('--noise_patch_scale', default={'lower': 0.3, 'upper': 1.0},
                     'gets perturbed by random noise')
 parser.add_argument('--generated_ratio', default=0.0, type=float, help='ratio of synthetically generated images mixed '
                     'into every training batch')
+parser.add_argument('--n2n_deepaugment', type=utils.str2bool, nargs='?', const=False, default=False,
+                    help='Whether to apply DeepAugment according to https://github.com/hendrycks/imagenet-r')
 
 args = parser.parse_args()
 configname = (f'experiments.configs.config{args.experiment}')
@@ -136,7 +139,7 @@ def train_epoch(pbar):
                                            args.mixup['p'], args.manifold['apply'], args.manifold['noise_factor'],
                                            args.cutmix['alpha'], args.cutmix['p'], args.minibatchsize,
                                            args.concurrent_combinations, args.noise_sparsity, args.noise_patch_scale['lower'],
-                                           args.noise_patch_scale['upper'], Dataloader.generated_ratio)
+                                           args.noise_patch_scale['upper'], Dataloader.generated_ratio, args.n2n_deepaugment)
             criterion.update(model, optimizer)
             loss = criterion(outputs, mixed_targets, inputs, targets)
         loss.retain_grad()
