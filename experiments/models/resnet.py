@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from experiments.models import ct_model
+import ImageNet as in_models
 
 
 class BasicBlock(nn.Module):
@@ -125,7 +126,10 @@ def ResNet34(num_classes, dataset, normalized, factor, activation_function='relu
                   activation_function=activation_function)
 
 def ResNet50(num_classes, dataset, normalized, factor, activation_function='relu'):
-    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes, dataset=dataset, normalized=normalized, factor=factor,
+    if dataset == 'ImageNet':
+        return in_models.resnet50(num_classes=num_classes, dataset=dataset, normalized=normalized, activation_function=activation_function)
+    else:
+        return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes, dataset=dataset, normalized=normalized, factor=factor,
                   activation_function=activation_function)
 
 def ResNet101(num_classes, dataset, normalized, factor, activation_function='relu'):
