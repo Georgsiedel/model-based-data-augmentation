@@ -230,8 +230,8 @@ def valid_epoch(pbar, net):
         if args.validonc == True:
             pbar.set_description(
                 '[Valid] Robust Accuracy Calculation. Last Robust Accuracy: {:.3f}'.format(Traintracker.valid_accs_robust[-1] if Traintracker.valid_accs_robust else 0))
-            acc_c = compute_c_corruptions(args.dataset, testsets_c, net, batchsize=100,
-                                          num_classes=Dataloader.num_classes, eval_run = True)[0]
+            acc_c = compute_c_corruptions(args.dataset, testsets_c, net, batchsize=200,
+                                          num_classes=Dataloader.num_classes, valid_run = True)[0]
         pbar.update(1)
 
     acc = 100. * correct / total
@@ -253,10 +253,10 @@ if __name__ == '__main__':
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams
     criterion = losses.Criterion(args.loss, trades_loss=args.trades_loss, robust_loss=args.robust_loss, **lossparams)
 
-    Dataloader = data.DataLoading(args.dataset, args.epochs, args.generated_ratio, args.resize, args.run, factor=args.pixel_factor)
+    Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run, factor=args.pixel_factor)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
-    Dataloader.load_base_data(validontest=args.validontest, test_only=False)
-    testsets_c = Dataloader.load_data_c(validontest=args.validontest, subset=args.validonc, subsetsize=100) if args.validonc else None
+    Dataloader.load_base_data(test_only=False)
+    testsets_c = Dataloader.load_data_c(subset=True, subsetsize=100, valid_run=True) if args.validonc else None
 
     # Construct model
     print(f'\nBuilding {args.modeltype} model with {args.modelparams} | Loss Function: {args.loss}, Stability Loss: {args.robust_loss}, Trades Loss: {args.trades_loss}')
@@ -321,8 +321,8 @@ if __name__ == '__main__':
         # Training loop
         for epoch in range(start_epoch, end_epoch):
 
-            #get new generated data sample in the trainset
-            trainloader = Dataloader.update_trainset(epoch, start_epoch)
+            #get new generated data sample in the trainset and reset the augmentation seed for corrupted data validation
+            trainloader = Dataloader.update_set(epoch, start_epoch)
 
             train_acc, train_loss = train_epoch(pbar)
             valid_acc, valid_loss, valid_acc_robust, valid_acc_adv = valid_epoch(pbar, model)
