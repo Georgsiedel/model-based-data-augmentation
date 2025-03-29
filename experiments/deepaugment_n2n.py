@@ -29,10 +29,7 @@ class N2N_DeepAugment(nn.Module):
         self.image_size = image_size
         self.channels = channels
         self.noise2net_batch_size = int(batch_size * ratio)
-        epsilon = 0.15 if image_size <= 64 else 0.5
-        smallscale = True if image_size <= 64 else False
-        hidden_planes = 9 if image_size <= 64 else 16
-        self.noise2net = Res2Net(epsilon=epsilon, hidden_planes=hidden_planes, batch_size=self.noise2net_batch_size, smallscale=smallscale).train().to(device)
+        self.noise2net = Res2Net(epsilon=0.5, hidden_planes=16, batch_size=self.noise2net_batch_size).train().to(device)
         self.noisenet_max_eps = noisenet_max_eps
 
     def forward(self, bx):
@@ -47,9 +44,12 @@ class N2N_DeepAugment(nn.Module):
             
             # Apply aug on a random subset according to ratio
             indices = torch.randperm(batchsize)[:self.noise2net_batch_size]
-            bx_auged = bx[indices].reshape((1, self.noise2net_batch_size * self.channels, self.image_size, self.image_size))
+
+            bx_auged = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)(bx[indices])
+            bx_auged = bx_auged.reshape((1, self.noise2net_batch_size * self.channels, 224, 224))
             bx_auged = self.noise2net(bx_auged)
-            bx_auged = bx_auged.reshape((self.noise2net_batch_size, self.channels, self.image_size, self.image_size))
+            bx_auged = bx_auged.reshape((self.noise2net_batch_size, self.channels, 224, 224))
+            bx_auged = nn.Upsample(size=(self.image_size, self.image_size), mode='bilinear', align_corners=False)(bx_auged)
             bx[indices] = bx_auged
 
         return bx
@@ -59,7 +59,7 @@ class GELU(torch.nn.Module):
         return F.gelu(x)
 
 class Bottle2neck(nn.Module):
-    def __init__(self, inplanes, planes, stride=1, hidden_planes=9, scale = 4, batch_size=5, smallscale=False):
+    def __init__(self, inplanes, planes, stride=1, hidden_planes=9, scale = 4, batch_size=5):
         """ Constructor
         Args:
             inplanes: input channel dimensionality (multiply by batch_size)
@@ -84,11 +84,7 @@ class Bottle2neck(nn.Module):
         bns = []
         for i in range(self.nums):
             K = random.choice([1, 3])
-
-            if smallscale:
-                D = random.choice([1, 2])
-            else:
-                D = random.choice([1, 2, 3])
+            D = random.choice([1, 2, 3])
 
             P = int(((K - 1) / 2) * D)
 
@@ -149,17 +145,15 @@ class Bottle2neck(nn.Module):
         return out
 
 class Res2Net(torch.nn.Module):
-    def __init__(self, epsilon=0.2, hidden_planes=16, batch_size=5, smallscale=False):
+    def __init__(self, epsilon=0.5, hidden_planes=16, batch_size=5):
         super(Res2Net, self).__init__()
         
         self.epsilon = epsilon
-        self.hidden_planes = hidden_planes
-        self.smallscale = smallscale
                 
-        self.block1 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size, smallscale=self.smallscale)
-        self.block2 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size, smallscale=self.smallscale)
-        self.block3 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size, smallscale=self.smallscale)
-        self.block4 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size, smallscale=self.smallscale)
+        self.block1 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size)
+        self.block2 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size)
+        self.block3 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size)
+        self.block4 = Bottle2neck(3, 3, hidden_planes=hidden_planes, batch_size=batch_size)
 
     def reload_parameters(self):
         for layer in self.modules():
