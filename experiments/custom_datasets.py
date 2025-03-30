@@ -1,5 +1,6 @@
 import random
 import torch
+import os
 from PIL import Image
 import torch.cuda.amp
 import torchvision.transforms as transforms
@@ -434,3 +435,39 @@ class AugmentedDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return self.total_size
+
+class StyleDataset(Dataset):
+    def __init__(self, root_dir, dataset_type, transform=None):
+        """
+        Args:
+            root_dir (string): Directory with all the images.
+            transform (callable, optional): Optional transform to be applied on a sample.
+        """
+        self.root_dir = root_dir
+        self.transform = transform
+        self.image_paths = [
+            os.path.join(root_dir, file)
+            for file in os.listdir(root_dir)
+            if file.endswith(".jpg")
+        ]
+        if dataset_type in ["CIFAR10", "CIFAR100"]:
+            self.transform = transforms.Resize((32, 32), antialias=True)
+        elif dataset_type == "TinyImageNet":
+            self.transform = transforms.Resize((64, 64), antialias=True)
+        elif dataset_type == "ImageNet":
+            self.transform = transforms.Resize((224, 224), antialias=True)
+        else:
+            raise AttributeError(f"Dataset: {dataset_type} is an unrecognized dataset")
+        self.transform = transforms.Compose([self.transform, transforms.ToTensor()])
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        img_path = self.image_paths[idx]
+        image = Image.open(img_path).convert("RGB")
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image

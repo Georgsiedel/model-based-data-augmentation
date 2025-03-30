@@ -46,7 +46,6 @@ class CtModel(nn.Module):
         noise_patch_upper_scale,
         generated_ratio,
     ):
-
         # define where mixup is applied. k=0 is in the input space, k>0 is in the embedding space (manifold mixup)
         if self.training == False:
             k = -1
@@ -83,8 +82,6 @@ class CtModel(nn.Module):
             out = noisy_out
             # plot_images(4, self.mean, self.std, noisy_out, noisy_out)
 
-            out = self.blocks[0](out)
-
         return out, targets
 
     def forward_noise_mixup(
@@ -108,8 +105,8 @@ class CtModel(nn.Module):
         style_feats,
         **kwargs,
     ):
-        if style_norm_type := kwargs.get("type", None):
-            int_adain_probability = kwargs.get("probability", 0.0)
+        if style_norm_type := kwargs.get("norm_type", None):
+            int_adain_probability = kwargs.get("style_probability", 0.0)
 
         # define where mixup is applied. k=0 is in the input space, k>0 is in the embedding space (manifold mixup)
         if self.training == False:
@@ -157,11 +154,11 @@ class CtModel(nn.Module):
         prob = torch.rand(1).item()
 
         for i, ResidualBlock in enumerate(self.blocks[1:]):
-            out = ResidualBlock(out)
-
             if style_norm_type == "pono":
                 if prob < int_adain_probability and i == 0:
                     out = self.pono(out, style_feats)
+
+            out = ResidualBlock(out)
 
             if k == (i + 1):  # Do manifold mixup if k is greater 0
                 out, targets = mixup_process(
