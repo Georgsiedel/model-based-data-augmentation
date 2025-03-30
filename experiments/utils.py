@@ -274,13 +274,15 @@ class Checkpoint:
 
     def save_checkpoint(self, model, swa_model, optimizer, scheduler, swa_scheduler, epoch):
 
+        #filtered_state_dict = {k: v for k, v in model.state_dict().items() if "deepaugment_instance" not in k}
+
         swa_model = None if swa_model == None else swa_model.state_dict()
         swa_scheduler = None if swa_scheduler == None else swa_scheduler.state_dict()
 
         if self.best_model == True:
             torch.save({
                 'epoch': epoch,
-                'model_state_dict': model.state_dict(),
+                'model_state_dict': model.state_dict(), #filtered_state_dict
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
                 'swa_model_state_dict': swa_model,

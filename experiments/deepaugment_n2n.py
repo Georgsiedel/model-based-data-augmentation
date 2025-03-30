@@ -24,18 +24,21 @@ import torch.nn.functional as F
 import random
 
 class N2N_DeepAugment(nn.Module):
-    def __init__(self, batch_size, image_size, channels, noisenet_max_eps=0.75, ratio=0.5):
+    def __init__(self, orig_batch_size, image_size, channels, noisenet_max_eps=0.75, ratio=0.5):
         super(N2N_DeepAugment, self).__init__()
         self.image_size = image_size
         self.channels = channels
-        self.noise2net_batch_size = int(batch_size * ratio)
+        self.ratio = ratio
+        self.noise2net_batch_size = int(orig_batch_size * ratio)
         self.noise2net = Res2Net(epsilon=0.5, hidden_planes=16, batch_size=self.noise2net_batch_size).train().to(device)
         self.noisenet_max_eps = noisenet_max_eps
 
     def forward(self, bx):
         batchsize = bx.shape[0]
-        if batchsize < self.noise2net_batch_size:
-            return
+
+        if self.noise2net_batch_size != int(batchsize * self.ratio): #last batch of an epoch may have different bs
+            self.noise2net_batch_size = int(batchsize * self.ratio)
+            self.noise2net = Res2Net(epsilon=0.5, hidden_planes=16, batch_size=self.noise2net_batch_size).train().to(device)
         
         with torch.no_grad():
             # Setup network

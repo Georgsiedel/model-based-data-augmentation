@@ -96,8 +96,6 @@ parser.add_argument('--warmupepochs', default=5, type=int,
                     help='Number of Warmupepochs for stable training early on. Start with factor 10 lower learning rate')
 parser.add_argument('--normalize', type=utils.str2bool, nargs='?', const=False, default=False,
                     help='Whether to normalize input data to mean=0 and std=1')
-parser.add_argument('--pixel_factor', default=1, type=int, help='default is 1 for 32px (CIFAR10), '
-                    'e.g. 2 for 64px images. Scales convolutions automatically in the same model architecture')
 parser.add_argument('--minibatchsize', default=8, type=int, help='batchsize, for which a new corruption type is sampled. '
                     'batchsize must be a multiple of minibatchsize. in case of p-norm corruptions with 0<p<inf, the same '
                     'corruption is applied for all images in the minibatch')
@@ -227,7 +225,7 @@ if __name__ == '__main__':
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams
     criterion = losses.Criterion(args.loss, trades_loss=args.trades_loss, robust_loss=args.robust_loss, **lossparams)
 
-    Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run, factor=args.pixel_factor)
+    Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
     Dataloader.load_base_data(test_only=False)
     testsets_c = Dataloader.load_data_c(subset=True, subsetsize=100, valid_run=True) if args.validonc else None
@@ -237,7 +235,7 @@ if __name__ == '__main__':
     
     model_class = getattr(models, args.modeltype)
     model = model_class(dataset=args.dataset, normalized =args.normalize, num_classes=Dataloader.num_classes,
-                        factor=args.pixel_factor, **args.modelparams)
+                        factor=Dataloader.factor, **args.modelparams)
     model = model.to(device) #torch.nn.DataParallel(model).to(device)
 
     # Define Optimizer, Learningrate Scheduler, Scaler, and Early Stopping

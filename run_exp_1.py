@@ -6,7 +6,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [302,303,304,305,406,407,408,409,410,411,412,413]:
+    for experiment in [509,406,407,408,409,410,411,412,413]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -16,19 +16,13 @@ if __name__ == '__main__':
         runs = 1
         run_iter = [0]
 
-        if experiment in [302,303,304,305]:
-            runs = 5
-            run_iter =[0,1,2,3,4]
-        if experiment in [303]:
-            runs = 5
-            run_iter =[1,2,3,4]
         if experiment in [406,407,408,409,410,411,412,413]:
             runs = 3
             run_iter =[1,2]
 
         for run in run_iter:
 
-            resume = True if experiment in [303,302] and run in [0,1] else False
+            resume = True if experiment in [406] and run in [1] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
@@ -45,7 +39,7 @@ if __name__ == '__main__':
                     f"\"{config.cutmix}\" --manifold=\"{config.manifold}\" --concurrent_combinations={config.concurrent_combinations}" \
                     f" --batchsize={config.batchsize} --number_workers={config.number_workers} " \
                     f"--RandomEraseProbability={config.RandomEraseProbability} --warmupepochs={config.warmupepochs}" \
-                    f" --normalize={config.normalize} --pixel_factor={config.pixel_factor} --minibatchsize=" \
+                    f" --normalize={config.normalize} --minibatchsize=" \
                     f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
                     f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} --n2n_deepaugment={config.n2n_deepaugment}"
@@ -57,7 +51,7 @@ if __name__ == '__main__':
         cmdeval = f"python experiments/eval.py --resume={resume} --experiment={experiment} --runs={runs} --batchsize={1000} " \
                 f"--dataset={config.dataset} --modeltype={config.modeltype} --modelparams=\"{config.modelparams}\" " \
                 f"--resize={config.resize} --combine_test_corruptions={config.combine_test_corruptions} --number_workers={0} " \
-                f"--normalize={config.normalize} --pixel_factor={config.pixel_factor} --test_on_c={config.test_on_c} " \
+                f"--normalize={config.normalize} --test_on_c={config.test_on_c} " \
                 f"--calculate_adv_distance={config.calculate_adv_distance} --adv_distance_params=\"{config.adv_distance_params}\" " \
                 f"--calculate_autoattack_robustness={config.calculate_autoattack_robustness} --autoattack_params=" \
                 f"\"{config.autoattack_params}\" --validontest={config.validontest}" \

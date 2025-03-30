@@ -50,14 +50,22 @@ def seed_worker(worker_id):
 
 
 class DataLoading():
-    def __init__(self, dataset, validontest=True, epochs=200, generated_ratio=0.0, resize = False, run=0, factor = 1):
+    def __init__(self, dataset, validontest=True, epochs=200, generated_ratio=0.0, resize = False, run=0):
         self.dataset = dataset
         self.generated_ratio = generated_ratio
         self.resize = resize
         self.run = run
         self.epochs = epochs
-        self.factor = factor
         self.validontest = validontest
+
+        if dataset == 'CIFAR10':
+            self.factor = 1
+        elif dataset == 'CIFAR100':
+            self.factor = 1
+        elif dataset == 'ImageNet':
+            self.factor = 1
+        elif dataset == 'TinyImageNet':
+            self.factor = 2
 
     def create_transforms(self, train_aug_strat_orig, train_aug_strat_gen, RandomEraseProbability=0.0):
         # list of all data transformations used

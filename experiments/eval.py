@@ -43,8 +43,6 @@ parser.add_argument('--number_workers', default=0, type=int, help='How many work
                     'loading. Experimental. 4 for ImageNet, 1 for Cifar. More demand GPU memory, but maximize GPU usage.')
 parser.add_argument('--normalize', type=utils.str2bool, nargs='?', const=False, default=False,
                     help='Whether to normalize input data to mean=0 and std=1')
-parser.add_argument('--pixel_factor', default=1, type=int, help='default is 1 for 32px (CIFAR10), '
-                    'e.g. 2 for 64px images. Scales convolutions automatically in the same model architecture')
 parser.add_argument('--test_on_c', type=utils.str2bool, nargs='?', const=True, default=True,
                     help='Whether to test on corrupted benchmark sets C and C-bar')
 parser.add_argument('--calculate_adv_distance', type=utils.str2bool, nargs='?', const=False, default=False,
@@ -108,7 +106,7 @@ if __name__ == '__main__':
         # Load model
         model_class = getattr(models, args.modeltype)
         model = model_class(dataset=args.dataset, normalized=args.normalize, num_classes=Dataloader.num_classes,
-                            factor=args.pixel_factor, **args.modelparams)
+                            factor=Dataloader.factor, **args.modelparams)
         model = model.to(device) #torch.nn.DataParallel(
 
         state_dict = torch.load(Testtracker.filename, weights_only=True)['model_state_dict']

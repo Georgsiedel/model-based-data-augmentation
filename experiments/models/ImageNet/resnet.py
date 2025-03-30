@@ -1,18 +1,23 @@
 from typing import Any, Callable, List, Optional, Type, Union
+from functools import partial
 
-from .utils import _ovewrite_named_param
+from torchvision.models._utils import _ovewrite_named_param
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from experiments.models import ct_model
+from torchvision.models._api import Weights, WeightsEnum
+from torchvision.transforms._presets import ImageClassification
+from torchvision.models._meta import _IMAGENET_CATEGORIES
 
 __all__ = [
     "ResNet",
     "resnet18",
-    "resnet50"
-    "resnext50_32x4d"
-]
+    "resnet50",
+    "ResNet18_Weights",
+    "ResNet50_Weights",
+    ]
 
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
     """3x3 convolution with padding"""
@@ -44,7 +49,7 @@ class BasicBlock(nn.Module):
         base_width: int = 64,
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
-        activation_function = F.relu,
+        activation_function = nn.ReLU,
     ) -> None:
         super().__init__()
         if norm_layer is None:
@@ -99,7 +104,7 @@ class Bottleneck(nn.Module):
         base_width: int = 64,
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
-        activation_function = F.relu
+        activation_function = nn.ReLU
     ) -> None:
         super().__init__()
         if norm_layer is None:
@@ -151,14 +156,30 @@ class ResNet(ct_model.CtModel):
         groups: int = 1,
         width_per_group: int = 64,
         dataset: str = 'ImageNet', 
-        activation_function='relu',
+        activation_function='ReLU',
                 
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
     ) -> None:
         super(ResNet, self).__init__(dataset=dataset, normalized=normalized, num_classes=num_classes)
-        self.activation_function = getattr(F, activation_function)
-    
+
+        # Mapping of lowercase names to proper torch.nn class names
+        activation_mapping = {
+            "silu": "SiLU",
+            "relu": "ReLU",
+            "gelu": "GELU",
+            "tanh": "Tanh",
+            "sigmoid": "Sigmoid",
+            # Add more activations as needed
+        }
+        # Normalize the activation function name
+        activation_class_name = activation_mapping.get(activation_function.lower())
+        if activation_class_name is None:
+            raise ValueError(f"Unsupported activation function: {activation_function}")
+        
+        # Dynamically get the activation class from torch.nn
+        self.activation_function = getattr(nn, activation_class_name)
+        
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
@@ -266,7 +287,7 @@ class ResNet(ct_model.CtModel):
 
         return x
     
-    def _ct_forward_impl(self, x, targets=None, robust_samples=0, corruptions=None, mixup_alpha=0.0, mixup_p=0.0, manifold=False,
+    def forward(self, x, targets=None, robust_samples=0, corruptions=None, mixup_alpha=0.0, mixup_p=0.0, manifold=False,
                 manifold_noise_factor=1, cutmix_alpha=0.0, cutmix_p=0.0, noise_minibatchsize=1,
                 concurrent_combinations=1, noise_sparsity=0.0, noise_patch_lower_scale=0.3, noise_patch_upper_scale=1.0,
                 generated_ratio=0.0, n2n_deepaugment=False):
@@ -277,35 +298,114 @@ class ResNet(ct_model.CtModel):
                                         noise_minibatchsize, concurrent_combinations, noise_sparsity,
                                         noise_patch_lower_scale, noise_patch_upper_scale, generated_ratio, n2n_deepaugment)
         out = self.layer4(out)
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
+        out = self.avgpool(out)
+        out = torch.flatten(out, 1)
+        out = self.fc(out)
 
         if self.training == True:
             return out, mixed_targets
         else:
             return out
 
-    def forward(self, x: Tensor) -> Tensor:
-        return self._ct_forward_impl(x)
-
 def _resnet(
     block: Type[Union[BasicBlock, Bottleneck]],
     layers: List[int],
+    weights: Optional[WeightsEnum],
+    progress: bool,
+    normalized,
+    dataset: str = 'ImageNet', 
+    activation_function='ReLU',
     **kwargs: Any,
 ) -> ResNet:
+    if weights is not None:
+        _ovewrite_named_param(kwargs, "num_classes", len(weights.meta["categories"]))
 
-    model = ResNet(block, layers, **kwargs)
+    model = ResNet(block=block, 
+                   layers=layers, 
+                   normalized=normalized, 
+                   dataset=dataset,
+                   activation_function=activation_function,
+                   **kwargs)
+
+    if weights is not None:
+        model.load_state_dict(weights.get_state_dict(progress=progress, check_hash=True), strict=False)
+
     return model
 
-def resnet18(*, progress: bool = True, **kwargs: Any) -> ResNet:
-    return _resnet(BasicBlock, [2, 2, 2, 2], **kwargs)
+_COMMON_META = {
+    "min_size": (1, 1),
+    "categories": _IMAGENET_CATEGORIES,
+}
 
-def resnet50(*, progress: bool = True, **kwargs: Any) -> ResNet:
-    return _resnet(Bottleneck, [3, 4, 6, 3], **kwargs)
+class ResNet18_Weights(WeightsEnum):
+    IMAGENET1K_V1 = Weights(
+        url="https://download.pytorch.org/models/resnet18-f37072fd.pth",
+        transforms=partial(ImageClassification, crop_size=224),
+        meta={
+            **_COMMON_META,
+            "num_params": 11689512,
+            "recipe": "https://github.com/pytorch/vision/tree/main/references/classification#resnet",
+            "_metrics": {
+                "ImageNet-1K": {
+                    "acc@1": 69.758,
+                    "acc@5": 89.078,
+                }
+            },
+            "_ops": 1.814,
+            "_file_size": 44.661,
+            "_docs": """These weights reproduce closely the results of the paper using a simple training recipe.""",
+        },
+    )
+    DEFAULT = IMAGENET1K_V1
 
-def resnext50_32x4d(*, progress: bool = True, **kwargs: Any
-) -> ResNet:
-    _ovewrite_named_param(kwargs, "groups", 32)
-    _ovewrite_named_param(kwargs, "width_per_group", 4)
-    return _resnet(Bottleneck, [3, 4, 6, 3], **kwargs)
+class ResNet50_Weights(WeightsEnum):
+    IMAGENET1K_V1 = Weights(
+        url="https://download.pytorch.org/models/resnet50-0676ba61.pth",
+        transforms=partial(ImageClassification, crop_size=224),
+        meta={
+            **_COMMON_META,
+            "num_params": 25557032,
+            "recipe": "https://github.com/pytorch/vision/tree/main/references/classification#resnet",
+            "_metrics": {
+                "ImageNet-1K": {
+                    "acc@1": 76.130,
+                    "acc@5": 92.862,
+                }
+            },
+            "_ops": 4.089,
+            "_file_size": 97.781,
+            "_docs": """These weights reproduce closely the results of the paper using a simple training recipe.""",
+        },
+    )
+    IMAGENET1K_V2 = Weights(
+        url="https://download.pytorch.org/models/resnet50-11ad3fa6.pth",
+        transforms=partial(ImageClassification, crop_size=224, resize_size=232),
+        meta={
+            **_COMMON_META,
+            "num_params": 25557032,
+            "recipe": "https://github.com/pytorch/vision/issues/3995#issuecomment-1013906621",
+            "_metrics": {
+                "ImageNet-1K": {
+                    "acc@1": 80.858,
+                    "acc@5": 95.434,
+                }
+            },
+            "_ops": 4.089,
+            "_file_size": 97.79,
+            "_docs": """
+                These weights improve upon the results of the original paper by using TorchVision's `new training recipe
+                <https://pytorch.org/blog/how-to-train-state-of-the-art-models-using-torchvision-latest-primitives/>`_.
+            """,
+        },
+    )
+    DEFAULT = IMAGENET1K_V2
+
+def resnet18(*, weights: Optional[ResNet18_Weights] = None, progress: bool = True, normalized, dataset: str = 'ImageNet', activation_function='ReLU', **kwargs: Any) -> ResNet:
+    weights = ResNet18_Weights.verify(weights)
+
+    return _resnet(block=BasicBlock, layers=[2, 2, 2, 2], weights=weights, progress=progress, normalized=normalized, dataset=dataset, activation_function=activation_function, **kwargs)
+
+def resnet50(*, weights: Optional[ResNet50_Weights] = None, progress: bool = True, normalized, dataset: str = 'ImageNet', activation_function='ReLU', **kwargs: Any) -> ResNet:
+    weights = ResNet50_Weights.verify(weights)
+
+    return _resnet(block=Bottleneck, layers=[3, 4, 6, 3], weights=weights, progress=progress, normalized=normalized, dataset=dataset, activation_function=activation_function, **kwargs)
