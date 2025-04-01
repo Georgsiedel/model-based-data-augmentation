@@ -160,6 +160,12 @@ class CtModel(nn.Module):
 
             out = ResidualBlock(out)
 
+            if style_norm_type == "int_adain":
+                if prob < int_adain_probability and i == 0:
+                    # style_feats = self.blocks[0](style_feats)
+                    style_feats = ResidualBlock(style_feats)
+                    out = self.internal_adain(out, style_feats)
+                    
             if k == (i + 1):  # Do manifold mixup if k is greater 0
                 out, targets = mixup_process(
                     out,
@@ -182,12 +188,6 @@ class CtModel(nn.Module):
                     sparse_level=0.65,
                     l0_level=0.0,
                 )
-
-            if style_norm_type == "int_adain":
-                if prob < int_adain_probability and i == 0:
-                    # style_feats = self.blocks[0](style_feats)
-                    style_feats = ResidualBlock(style_feats)
-                    out = self.internal_adain(out, style_feats)
 
         return out, targets
 
