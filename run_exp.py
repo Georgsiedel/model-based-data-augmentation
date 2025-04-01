@@ -47,7 +47,7 @@ if __name__ == '__main__':
                     f" --normalize={config.normalize} --pixel_factor={config.pixel_factor} --minibatchsize=" \
                     f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
-                    f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} "
+                    f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} --int_adain_params=\"{config.int_adain_params}\""
             os.system(cmd0)
 
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption

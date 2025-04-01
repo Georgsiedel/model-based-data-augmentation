@@ -15,7 +15,7 @@ import experiments.custom_transforms as custom_transforms
 from run_exp import device
 from experiments.utils import plot_images, CsvHandler
 from experiments.custom_datasets import SubsetWithTransform, GeneratedDataset, AugmentedDataset, ListDataset, CustomDataset 
-from experiments.custom_datasets import BalancedRatioSampler, GroupedAugmentedDataset, ReproducibleBalancedRatioSampler
+from experiments.custom_datasets import BalancedRatioSampler, GroupedAugmentedDataset, ReproducibleBalancedRatioSampler, StyleDataset
 
 def normalization_values(batch, dataset, normalized, manifold=False, manifold_factor=1):
 
@@ -142,6 +142,12 @@ class DataLoading():
             self.testset = [(self.transforms_preprocess(data), target) for data, target in validset]
                 
             self.num_classes = len(base_trainset.classes)
+    
+    def load_style_dataloader(self, style_dir, batch_size):
+        style_dataset = StyleDataset(style_dir, dataset_type=self.dataset)
+        style_loader = DataLoader(style_dataset, batch_size=batch_size, shuffle=False)
+        return style_loader
+
         
 
     def load_augmented_traindata(self, target_size, epoch=0, robust_samples=0):
