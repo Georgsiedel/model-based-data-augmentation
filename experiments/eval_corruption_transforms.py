@@ -187,7 +187,13 @@ def shot_noise(x, severity=1, scale='in'):
     return np.clip(np.random.poisson(x * c) / float(c), 0, 1) * 255
 
 
-def impulse_noise(x, severity=1, scale='in'):
+def impulse_noise(x, severity=1, scale='in', rng=None):
+
+    if rng is None: 
+        #global worker rng with fixed seed to make this reproducible every time the Dataloader is initialized
+        from data import fixed_worker_rng
+        rng = fixed_worker_rng
+
     if scale == 'cifar':
         c = [.01, .02, .03, .05, .07][severity - 1]
     elif scale == 'tin':
@@ -195,7 +201,7 @@ def impulse_noise(x, severity=1, scale='in'):
     else:
         c = [.03, .06, .09, 0.17, 0.27][severity - 1]
 
-    x = sk.util.random_noise(np.array(x) / 255., mode='s&p', amount=c)
+    x = sk.util.random_noise(np.array(x) / 255., mode='s&p', amount=c, rng=rng)
     return np.clip(x, 0, 1) * 255
 
 

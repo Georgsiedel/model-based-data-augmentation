@@ -42,21 +42,22 @@ def normalization_values(batch, dataset, normalized, manifold=False, manifold_fa
 
     return mean, std
 
-
 def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2 ** 32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
-
+    global fixed_worker_rng #impulse noise augmentations sk-learn function needs a separate rng for reproducibility
+    fixed_worker_rng = np.random.default_rng()
 
 class DataLoading():
-    def __init__(self, dataset, validontest=True, epochs=200, generated_ratio=0.0, resize = False, run=0):
+    def __init__(self, dataset, validontest=True, epochs=200, generated_ratio=0.0, resize = False, run=0, number_workers=0):
         self.dataset = dataset
         self.generated_ratio = generated_ratio
         self.resize = resize
         self.run = run
         self.epochs = epochs
         self.validontest = validontest
+        self.number_workers = number_workers
 
         if dataset == 'CIFAR10':
             self.factor = 1
@@ -210,6 +211,8 @@ class DataLoading():
         np.random.seed(self.run) # to make subsamples reproducible
         torch.manual_seed(self.run)
         random.seed(self.run)
+        global fixed_worker_rng #impulse noise augmentations sk-learn function needs a separate rng for reproducibility
+        fixed_worker_rng = np.random.default_rng()
 
         if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
             #c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
@@ -240,11 +243,31 @@ class DataLoading():
                         selected_indices = np.random.choice(len(self.testset), subsetsize, replace=False)
                         random_corrupted_testset = Subset(random_corrupted_testset, selected_indices)
                     
-                    # If valid_run, precompute the transformed outputs and wrap them as a standard dataset. (we do not want to online tranform every epoch)
+                    # If valid_run, precompute the transformed outputs and wrap them as a standard dataset. (we do not want to tranform every epoch)
                     if valid_run:
-                        precomputed_samples = [sample for sample in random_corrupted_testset]
-                        # Wrap the precomputed samples in a dataset so that further processing sees a standard Dataset object.
-                        random_corrupted_testset = ListDataset(precomputed_samples)
+                        if corruption in ['caustic_refraction', 'sparkles']:
+
+                            r = torch.Generator()
+                            r.manual_seed(0) #ensure that the same testset is always used when generating random corruptions
+
+                            precompute_loader = DataLoader(
+                                random_corrupted_testset,
+                                batch_size=1,
+                                shuffle=False,
+                                pin_memory=True,
+                                num_workers=self.number_workers,
+                                worker_init_fn=seed_worker,
+                                generator=r
+                            )
+                            
+                            precomputed_samples = [(sample[0], label[0]) for sample, label in precompute_loader]
+                            # Wrap the precomputed samples in a dataset so that further processing sees a standard Dataset object.
+                            random_corrupted_testset = ListDataset(precomputed_samples)
+                        
+                        else:
+                            precomputed_samples = [sample for sample in random_corrupted_testset]
+                            #Wrap the precomputed samples in a dataset so that further processing sees a standard Dataset object.
+                            random_corrupted_testset = ListDataset(precomputed_samples)
                                             
                     c_datasets.append(random_corrupted_testset)
                     
@@ -278,9 +301,29 @@ class DataLoading():
 
                     # If valid_run, precompute the transformed outputs and wrap them as a standard dataset (we do not want to online tranform every epoch)
                     if valid_run:
-                        precomputed_samples = [sample for sample in random_corrupted_testset]
-                        # Wrap the precomputed samples in a dataset so that further processing sees a standard Dataset object.
-                        random_corrupted_testset = ListDataset(precomputed_samples)
+                        if corruption in ['caustic_refraction', 'sparkles']:
+
+                            r = torch.Generator()
+                            r.manual_seed(0) #ensure that the same testset is always (run, epoch) used when generating random corruptions
+
+                            precompute_loader = DataLoader(
+                                random_corrupted_testset,
+                                batch_size=1,
+                                shuffle=False,
+                                pin_memory=True,
+                                num_workers=self.number_workers,
+                                worker_init_fn=seed_worker,
+                                generator=r
+                            )
+                            
+                            precomputed_samples = [(sample[0], label[0]) for sample, label in precompute_loader]
+                            # Wrap the precomputed samples in a dataset so that further processing sees a standard Dataset object.
+                            random_corrupted_testset = ListDataset(precomputed_samples)
+                        
+                        else:
+                            precomputed_samples = [sample for sample in random_corrupted_testset]
+                            #Wrap the precomputed samples in a dataset so that further processing sees a standard Dataset object.
+                            random_corrupted_testset = ListDataset(precomputed_samples)
                                             
                     c_datasets.append(random_corrupted_testset)
 
@@ -296,8 +339,8 @@ class DataLoading():
 
         return self.c_datasets_dict
 
-    def get_loader(self, batchsize, number_workers):
-        self.number_workers = number_workers
+    def get_loader(self, batchsize):
+
         self.batchsize = batchsize
 
         g = torch.Generator()
@@ -310,10 +353,11 @@ class DataLoading():
             self.CustomSampler = BatchSampler(RandomSampler(self.trainset), batch_size=batchsize, drop_last=False)
 
         self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
-                                      num_workers=number_workers, worker_init_fn=seed_worker, 
+                                      num_workers=self.number_workers, worker_init_fn=seed_worker, 
                                         generator=g, persistent_workers=False)
-
-        self.testloader = DataLoader(self.testset, batch_size=batchsize, pin_memory=False, num_workers=0)
+        
+        val_workers = self.number_workers if self.dataset=='ImageNet' else 0
+        self.testloader = DataLoader(self.testset, batch_size=batchsize, pin_memory=True, num_workers=val_workers)
 
         return self.trainloader, self.testloader
     
@@ -374,8 +418,7 @@ class DataLoading():
                                 self.stylization_gen, self.transforms_orig_after_style, self.transforms_gen_after_style, 
                                 self.transforms_orig_after_nostyle, self.transforms_gen_after_nostyle, self.robust_samples, epoch)
 
-    def get_loader_grouped(self, batchsize, number_workers):
-        self.number_workers = number_workers
+    def get_loader_grouped(self, batchsize):
         self.batchsize = batchsize
 
         g = torch.Generator()
@@ -385,10 +428,11 @@ class DataLoading():
                                                  batch_size=batchsize, epoch=self.epoch)
 
         self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
-                                      num_workers=number_workers, worker_init_fn=seed_worker, 
+                                      num_workers=self.number_workers, worker_init_fn=seed_worker, 
                                         generator=g, persistent_workers=False)
-
-        self.validationloader = DataLoader(self.validset, batch_size=batchsize, pin_memory=False, num_workers=0)
+        
+        val_workers = self.number_workers if self.dataset=='ImageNet' else 0
+        self.validationloader = DataLoader(self.validset, batch_size=batchsize, pin_memory=True, num_workers=val_workers)
 
         return self.trainloader, self.validationloader
 

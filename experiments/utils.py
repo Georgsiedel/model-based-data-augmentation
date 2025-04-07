@@ -433,6 +433,8 @@ class TrainTracking:
         shutil.copyfile(self.config_src_path, self.config_dst_path)
 
     def print_results(self):
+        if not self.elapsed_time: #if we train for 0 epochs (just loading pretrained model)
+            return
         print('Total training time: ', str(datetime.timedelta(seconds=max(self.elapsed_time))))
         print("Maximum (non-SWA) validation accuracy of", max(self.valid_accs), "achieved after",
               np.argmax(self.valid_accs) + 1, "epochs; ")

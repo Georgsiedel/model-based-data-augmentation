@@ -39,8 +39,7 @@ parser.add_argument('--resize', type=utils.str2bool, nargs='?', const=False, def
                     help='Resize a model to 224x224 pixels, standard for models like transformers.')
 parser.add_argument('--combine_test_corruptions', type=utils.str2bool, nargs='?', const=False, default=False,
                     help='Whether to combine all testing noise values by drawing from the randomly')
-parser.add_argument('--number_workers', default=0, type=int, help='How many workers are launched to parallelize data '
-                    'loading. Experimental. 4 for ImageNet, 1 for Cifar. More demand GPU memory, but maximize GPU usage.')
+parser.add_argument('--number_workers', default=0, type=int, help='How many workers are launched to parallelize data loading.')
 parser.add_argument('--normalize', type=utils.str2bool, nargs='?', const=False, default=False,
                     help='Whether to normalize input data to mean=0 and std=1')
 parser.add_argument('--test_on_c', type=utils.str2bool, nargs='?', const=True, default=True,
@@ -95,11 +94,12 @@ if __name__ == '__main__':
 
     for run in range(args.runs):
         # Load data
-        Dataloader = data.DataLoading(dataset=args.dataset, validontest=args.validontest, generated_ratio=0.0, resize=args.resize, run=run)
+        Dataloader = data.DataLoading(dataset=args.dataset, validontest=args.validontest, generated_ratio=0.0, resize=args.resize, 
+                                      run=run, number_workers=args.number_workers)
         Dataloader.create_transforms(train_aug_strat_orig='None', train_aug_strat_gen='None')
         Dataloader.load_base_data(test_only=True)
         
-        testloader = torch.utils.data.DataLoader(Dataloader.testset, batch_size=args.batchsize, pin_memory=False, num_workers=0)
+        testloader = torch.utils.data.DataLoader(Dataloader.testset, batch_size=args.batchsize, pin_memory=True, num_workers=args.number_workers)
             
         Testtracker.initialize(run)
 
@@ -133,7 +133,7 @@ if __name__ == '__main__':
 
             testsets_c = Dataloader.load_data_c(subset=subset, subsetsize=subsetsize, valid_run=False)
             accs_c = eval_corruptions.compute_c_corruptions(args.dataset, testsets_c, model, args.batchsize,
-                                                            Dataloader.num_classes, valid_run=False)
+                                                            Dataloader.num_classes, valid_run=False, workers=args.number_workers)
             Testtracker.track_results(accs_c)
 
         if args.calculate_adv_distance == True:  # adversarial distance calculation

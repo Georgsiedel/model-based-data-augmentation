@@ -5,7 +5,6 @@ from torchmetrics.classification import MulticlassCalibrationError
 from run_exp import device
 from noise import apply_noise
 from utils import plot_images
-from data import seed_worker
 
 def select_p_corruptions(testloader, model, test_corruptions, dataset, combine_test_corruptions):
     if combine_test_corruptions:  # combined p-norm corruption robust accuracy
@@ -40,17 +39,19 @@ def compute_p_corruptions(testloader, model, test_corruptions, dataset):
         acc = 100.*correct/total
         return acc
 
-def compute_c_corruptions(dataset, testsets_c, model, batchsize, num_classes, valid_run = False):
+def compute_c_corruptions(dataset, testsets_c, model, batchsize, num_classes, valid_run = False, workers = 0):
+
+    from data import seed_worker
+
     accs_c, rmsce_c_list = [], []
     if valid_run == False:
         print(f"Testing on {dataset}-c/c-bar Benchmark")
-    
+
     t = torch.Generator()
-    t.manual_seed(0) #ensure that the same testset is always (run, epoch) used when generating random corruptions
-    numworkers = 0 if valid_run else 2
+    t.manual_seed(0) #ensure that the same testset is always used when we are not working with the fixed benchmarks
 
     for corruption, corruption_testset in testsets_c.items():
-        testloader_c = DataLoader(corruption_testset, batch_size=batchsize, shuffle=False, pin_memory=True, num_workers=numworkers, 
+        testloader_c = DataLoader(corruption_testset, batch_size=batchsize, shuffle=False, pin_memory=True, num_workers=workers, 
                                   worker_init_fn=seed_worker, generator=t)
         acc, rmsce_c = compute_c(testloader_c, model, num_classes)
         accs_c.append(acc)

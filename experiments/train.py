@@ -202,8 +202,8 @@ def valid_epoch(pbar, net):
         if args.validonc == True:
             pbar.set_description(
                 '[Valid] Robust Accuracy Calculation. Last Robust Accuracy: {:.3f}'.format(Traintracker.valid_accs_robust[-1] if Traintracker.valid_accs_robust else 0))
-            acc_c = compute_c_corruptions(args.dataset, testsets_c, net, batchsize=200,
-                                          num_classes=Dataloader.num_classes, valid_run = True)[0]
+            acc_c = compute_c_corruptions(args.dataset, testsets_c, net, batchsize=500, num_classes=Dataloader.num_classes, valid_run = True, 
+                                          workers = args.number_workers)[0]
         pbar.update(1)
 
     acc = 100. * correct / total
@@ -225,7 +225,7 @@ if __name__ == '__main__':
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams
     criterion = losses.Criterion(args.loss, trades_loss=args.trades_loss, robust_loss=args.robust_loss, **lossparams)
 
-    Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run)
+    Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run, args.number_workers)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
     Dataloader.load_base_data(test_only=False)
     testsets_c = Dataloader.load_data_c(subset=True, subsetsize=100, valid_run=True) if args.validonc else None
@@ -283,7 +283,7 @@ if __name__ == '__main__':
         Dataloader.load_augmented_traindata(target_size=len(Dataloader.base_trainset),
                                             epoch=start_epoch,
                                             robust_samples=criterion.robust_samples)
-        trainloader, validationloader = Dataloader.get_loader(args.batchsize, args.number_workers)
+        trainloader, validationloader = Dataloader.get_loader(args.batchsize)
     
         # Training loop
         for epoch in range(start_epoch, end_epoch):

@@ -20,7 +20,7 @@ services:
       - ./run_exp_1.py:/workspace/run_exp_1.py
       - ./run_exp_2.py:/workspace/run_exp_2.py
       - ./run_exp_3.py:/workspace/run_exp_3.py
-    command: ["taskset", "-c", "32-39", "/bin/bash"]
+    command: ["taskset", "-c", "64-79", "/bin/bash"]
     #command: python run_exp.py  # Run the main script for this container
     tty: true
 
@@ -29,7 +29,7 @@ services:
       service: python-gpu-container-gpu0
     environment:
       NVIDIA_VISIBLE_DEVICES: "1"  # Restrict to GPU 1
-    command: ["taskset", "-c", "40-47", "/bin/bash"]
+    command: ["taskset", "-c", "80-95", "/bin/bash"]
     #command: python run_exp_1.py  # Run a different script for this container
     tty: true
 
@@ -38,7 +38,7 @@ services:
       service: python-gpu-container-gpu0
     environment:
       NVIDIA_VISIBLE_DEVICES: "2"  # Restrict to GPU 2
-    command: ["taskset", "-c", "48-55", "/bin/bash"]
+    command: ["taskset", "-c", "96-111", "/bin/bash"]
     #command: python run_exp_2.py  # Run a different script for this container
     tty: true
 
@@ -47,6 +47,6 @@ services:
       service: python-gpu-container-gpu0
     environment:
       NVIDIA_VISIBLE_DEVICES: "3"  # Restrict to GPU 3
-    command: ["taskset", "-c", "56-63", "/bin/bash"] 
+    command: ["taskset", "-c", "112-127", "/bin/bash"] 
     #command: python run_exp_3.py  # Run a different script for this container
     tty: true
