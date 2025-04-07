@@ -7,7 +7,7 @@ torch.cuda.device_count()
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [510,372,373,376,377,378,379,380,381,382,383,386,387,388]:
+    for experiment in [381,382,383,386,387,388]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -17,16 +17,13 @@ if __name__ == '__main__':
         runs = 1
         run_iter = [0] 
 
-        if experiment in [373,376,377,378,379,380,381,382,383,386,387,388]:
+        if experiment in [381,382,383,386,387,388]:
             runs = 3
             run_iter =[1,2]
-        if experiment in [372]:
-            runs = 3
-            run_iter =[1]
 
         for run in run_iter:
 
-            resume = True if experiment in [510,372] and run in [0,1] else False
+            resume = True if experiment in [381] and run in [1] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
@@ -54,7 +51,7 @@ if __name__ == '__main__':
         print('Beginning metric evaluation')
         cmdeval = f"python experiments/eval.py --resume={resume} --experiment={experiment} --runs={runs} --batchsize={1000} " \
                 f"--dataset={config.dataset} --modeltype={config.modeltype} --modelparams=\"{config.modelparams}\" " \
-                f"--resize={config.resize} --combine_test_corruptions={config.combine_test_corruptions} --number_workers={0} " \
+                f"--resize={config.resize} --combine_test_corruptions={config.combine_test_corruptions} --number_workers={config.number_workers} " \
                 f"--normalize={config.normalize} --test_on_c={config.test_on_c} " \
                 f"--calculate_adv_distance={config.calculate_adv_distance} --adv_distance_params=\"{config.adv_distance_params}\" " \
                 f"--calculate_autoattack_robustness={config.calculate_autoattack_robustness} --autoattack_params=" \
