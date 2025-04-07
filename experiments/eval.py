@@ -98,8 +98,9 @@ if __name__ == '__main__':
                                       run=run, number_workers=args.number_workers)
         Dataloader.create_transforms(train_aug_strat_orig='None', train_aug_strat_gen='None')
         Dataloader.load_base_data(test_only=True)
+        workers = 0 if args.validontest else args.number_workers
         
-        testloader = torch.utils.data.DataLoader(Dataloader.testset, batch_size=args.batchsize, pin_memory=True, num_workers=args.number_workers)
+        testloader = torch.utils.data.DataLoader(Dataloader.testset, batch_size=args.batchsize, pin_memory=True, num_workers=workers)
             
         Testtracker.initialize(run)
 
@@ -133,18 +134,18 @@ if __name__ == '__main__':
 
             testsets_c = Dataloader.load_data_c(subset=subset, subsetsize=subsetsize, valid_run=False)
             accs_c = eval_corruptions.compute_c_corruptions(args.dataset, testsets_c, model, args.batchsize,
-                                                            Dataloader.num_classes, valid_run=False, workers=args.number_workers)
+                                                            Dataloader.num_classes, valid_run=False, workers=workers)
             Testtracker.track_results(accs_c)
 
         if args.calculate_adv_distance == True:  # adversarial distance calculation
             adv_acc, dist_sorted, mean_dist = eval_adversarial.compute_adv_distance(Dataloader.testset,
-                                                            args.number_workers, model, args.adv_distance_params)
+                                                            0, model, args.adv_distance_params)
             Testtracker.track_results(np.concatenate(([adv_acc], mean_dist)))
             Testtracker.save_adv_distance(dist_sorted, args.adv_distance_params)
 
         if args.calculate_autoattack_robustness == True:  # adversarial accuracy calculation
             adv_acc_aa, mean_dist_aa = eval_adversarial.compute_adv_acc(args.autoattack_params, Dataloader.testset,
-                                                                        model, args.number_workers, args.batchsize)
+                                                                        model, 0, args.batchsize)
             Testtracker.track_results([adv_acc_aa, mean_dist_aa])
 
         # Robust Accuracy on p-norm noise - either combined or separate noise types

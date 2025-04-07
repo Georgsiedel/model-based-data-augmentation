@@ -245,7 +245,7 @@ class DataLoading():
                     
                     # If valid_run, precompute the transformed outputs and wrap them as a standard dataset. (we do not want to tranform every epoch)
                     if valid_run:
-                        if corruption in ['caustic_refraction', 'sparkles']:
+                        if corruption in ['caustic_refraction', 'sparkles']: #compute heavier corruptions
 
                             r = torch.Generator()
                             r.manual_seed(0) #ensure that the same testset is always used when generating random corruptions
@@ -301,7 +301,7 @@ class DataLoading():
 
                     # If valid_run, precompute the transformed outputs and wrap them as a standard dataset (we do not want to online tranform every epoch)
                     if valid_run:
-                        if corruption in ['caustic_refraction', 'sparkles']:
+                        if corruption in ['caustic_refraction', 'sparkles']:  #compute heavier corruptions
 
                             r = torch.Generator()
                             r.manual_seed(0) #ensure that the same testset is always (run, epoch) used when generating random corruptions

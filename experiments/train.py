@@ -203,7 +203,7 @@ def valid_epoch(pbar, net):
             pbar.set_description(
                 '[Valid] Robust Accuracy Calculation. Last Robust Accuracy: {:.3f}'.format(Traintracker.valid_accs_robust[-1] if Traintracker.valid_accs_robust else 0))
             acc_c = compute_c_corruptions(args.dataset, testsets_c, net, batchsize=500, num_classes=Dataloader.num_classes, valid_run = True, 
-                                          workers = args.number_workers)[0]
+                                          workers = 0)[0]
         pbar.update(1)
 
     acc = 100. * correct / total
