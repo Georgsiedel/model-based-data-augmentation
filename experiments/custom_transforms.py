@@ -199,6 +199,8 @@ class TransformFactory:
             return BatchStyleTransforms(stylized_ratio=0.8, batch_size=50, transform_style=self._stylization(0.95, 0.4, 0.7)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
         elif strat_name == "TAandStyle90alpha04-07":
             return BatchStyleTransforms(stylized_ratio=0.9, batch_size=50, transform_style=self._stylization(0.95, 0.4, 0.7)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
+        elif strat_name == "TAandStyle100alpha04-07":
+            return BatchStyleTransforms(stylized_ratio=1.0, batch_size=50, transform_style=self._stylization(0.95, 0.4, 0.7)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
         elif strat_name == "TAandStyle10alpha10":
             return BatchStyleTransforms(stylized_ratio=0.1, batch_size=50, transform_style=self._stylization(0.95, 1.0, 1.0)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
         elif strat_name == "TAandStyle20alpha10":

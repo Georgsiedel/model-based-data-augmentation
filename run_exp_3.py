@@ -17,13 +17,16 @@ if __name__ == '__main__':
         runs = 1
         run_iter = [0] 
 
-        if experiment in [381,382,383,386,387,388]:
+        if experiment in [382,383,386,387,388]:
             runs = 3
             run_iter =[1,2]
+        if experiment in [381]:
+            runs = 3
+            run_iter =[2]
 
         for run in run_iter:
 
-            resume = True if experiment in [381] and run in [1] else False
+            resume = True if experiment in [381] and run in [2] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
