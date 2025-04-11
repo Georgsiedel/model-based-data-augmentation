@@ -166,7 +166,8 @@ def train_epoch(pbar):
                                            args.mixup['p'], args.manifold['apply'], args.manifold['noise_factor'],
                                            args.cutmix['alpha'], args.cutmix['p'], args.minibatchsize,
                                            args.concurrent_combinations, args.noise_sparsity, args.noise_patch_scale['lower'],
-                                           args.noise_patch_scale['upper'], Dataloader.generated_ratio, args.n2n_deepaugment, style_feats=style_feats, **args.int_adain_params)
+                                           args.noise_patch_scale['upper'], Dataloader.generated_ratio, args.n2n_deepaugment, 
+                                           style_feats=style_feats, **args.int_adain_params)
             criterion.update(model, optimizer)
             loss = criterion(outputs, mixed_targets, inputs, targets)
         loss.retain_grad()
@@ -318,6 +319,8 @@ if __name__ == '__main__':
             style_dataloader = Dataloader.load_style_dataloader(
                 style_dir=style_dir, batch_size=args.batchsize
             )
+        else: 
+            style_dataloader = None
     
         # Training loop
         for epoch in range(start_epoch, end_epoch):

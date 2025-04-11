@@ -100,13 +100,14 @@ class ResNet(ct_model.CtModel):
     def forward(self, x, targets=None, robust_samples=0, corruptions=None, mixup_alpha=0.0, mixup_p=0.0, manifold=False,
                 manifold_noise_factor=1, cutmix_alpha=0.0, cutmix_p=0.0, noise_minibatchsize=1,
                 concurrent_combinations=1, noise_sparsity=0.0, noise_patch_lower_scale=0.3, noise_patch_upper_scale=1.0,
-                generated_ratio=0.0, n2n_deepaugment=False):
+                generated_ratio=0.0, n2n_deepaugment=False, style_feats=None, **kwargs):
 
         out = super(ResNet, self).forward_normalize(x)
         out, mixed_targets = super(ResNet, self).forward_noise_mixup(out, targets, robust_samples, corruptions,
                                         mixup_alpha, mixup_p, manifold, manifold_noise_factor, cutmix_alpha, cutmix_p,
                                         noise_minibatchsize, concurrent_combinations, noise_sparsity,
-                                        noise_patch_lower_scale, noise_patch_upper_scale, generated_ratio, n2n_deepaugment)
+                                        noise_patch_lower_scale, noise_patch_upper_scale, generated_ratio, n2n_deepaugment, 
+                                        style_feats, **kwargs)
         out = self.layer4(out)
         out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)

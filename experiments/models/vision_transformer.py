@@ -285,7 +285,8 @@ class VisionTransformer(ct_model.CtModel):
 
     def forward(self, x, targets=None, robust_samples=0, corruptions=None, mixup_alpha=0.0, mixup_p=0.0, manifold=False, 
                 noise_factor=3, cutmix_alpha=0.0, cutmix_p=0.0, noise_minibatchsize=1, concurrent_combinations=1, 
-                noise_sparsity=0.0, noise_patch_lower_scale = 1.0, noise_patch_upper_scale=1.0, generated_ratio=0.0, n2n_deepaugment=False):
+                noise_sparsity=0.0, noise_patch_lower_scale = 1.0, noise_patch_upper_scale=1.0, generated_ratio=0.0, 
+                n2n_deepaugment=False, style_feats=None, **kwargs):
         
         #normalize if needed and apply noise injections and mixup methods
         x = super(VisionTransformer, self).forward_normalize(x)

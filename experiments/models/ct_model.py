@@ -80,8 +80,8 @@ class CtModel(nn.Module):
         noise_patch_lower_scale,
         noise_patch_upper_scale,
         generated_ratio,
-        style_feats,
         n2n_deepaugment,
+        style_feats,
         **kwargs,
     ):
         if style_norm_type := kwargs.get("norm_type", None):
