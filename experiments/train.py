@@ -312,7 +312,7 @@ if __name__ == '__main__':
         Dataloader.load_augmented_traindata(target_size=len(Dataloader.base_trainset),
                                             epoch=start_epoch,
                                             robust_samples=criterion.robust_samples)
-        trainloader, validationloader = Dataloader.get_loader(args.batchsize, args.number_workers)
+        trainloader, validationloader = Dataloader.get_loader(args.batchsize)
 
         if style_dir := args.int_adain_params.get("style_dir", None):
             style_dataloader = Dataloader.load_style_dataloader(
