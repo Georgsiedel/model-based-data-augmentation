@@ -10,9 +10,10 @@ services:
     environment:
       NVIDIA_VISIBLE_DEVICES: "0"  # Restrict to GPU 0
       CUDA_HOME: "/usr/local/cuda"
-      LD_LIBRARY_PATH: "/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
+      LD_LIBRARY_PATH: "/usr/local/lib:/usr/lib:/lib:$LD_LIBRARY_PATH"
     volumes:
-      - /home/siedel/data:/data
+      - /data/siedel/datasets:/data
+      - /home/siedel/data/ImageNet:/data/ImageNet
       - /home/siedel/trained_models:/trained_models
       - ./results:/workspace/results
       - ./experiments/configs:/workspace/experiments/configs
