@@ -20,7 +20,7 @@ def main():
     args = parser.parse_args()
 
     # Build command string to pass args to the actual pipeline
-    cmd = f"python fid/fid_runner.py --dataset {args.dataset} --alpha_min {args.alpha_min} --alpha_max {args.alpha_max} --probability {args.probability}"
+    cmd = f"python /kaggle/working/model-based-data-augmentation/fid/fid_runner.py --dataset {args.dataset} --alpha_min {args.alpha_min} --alpha_max {args.alpha_max} --probability {args.probability}"
 
     if args.num:
         cmd += f" --num_to_sample {args.num}"
