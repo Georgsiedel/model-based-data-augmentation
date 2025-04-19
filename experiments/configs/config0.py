@@ -25,14 +25,14 @@ concurrent_combinations = 1  # only has an effect if combine_train_corruption is
 batchsize = 256
 minibatchsize = 8
 dataset = "CIFAR10"  # ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
-generated_ratio = 0.0 # Without gen data
+generated_ratio = 0.0  # Without gen data
 normalize = True
 validontest = True
 validonc = True
 validonadv = False
 lrschedule = "CosineAnnealingWarmRestarts"
 learningrate = 0.1
-epochs = 300
+epochs = 2
 lrparams = {"T_0": 20, "T_mult": 2}
 warmupepochs = 0
 earlystop = False
@@ -73,9 +73,10 @@ RandomEraseProbability = 0.0
 swa = {"apply": True, "start_factor": 0.9, "lr_factor": 0.2}
 kaggle = True
 int_adain_params = {
-    "norm_type": "int_adain",  # int_adain, pono
+    "norm_type": "pono",  # int_adain, pono
     "style_probability": 0.5,
     "style_dir": "/kaggle/input/painter-by-numbers-resized",
+    "moex_mode": True,
 }
 
 # define train and test corruptions:
