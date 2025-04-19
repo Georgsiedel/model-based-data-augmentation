@@ -4,8 +4,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-#from experiments.models import ct_model
-from . import ct_model
+from experiments.models import ct_model
 
 
 class Bottleneck(nn.Module):
@@ -84,12 +83,13 @@ class DenseNet(ct_model.CtModel):
     def forward(self, x, targets=None, robust_samples=0, corruptions=None, mixup_alpha=0.0, mixup_p=0.0, manifold=False,
                 manifold_noise_factor=1, cutmix_alpha=0.0, cutmix_p=0.0, noise_minibatchsize=1,
                 concurrent_combinations=1, noise_sparsity=0.0, noise_patch_lower_scale=0.3, noise_patch_upper_scale=1.0,
-                generated_ratio=0.0):
+                generated_ratio=0.0, n2n_deepaugment=False, style_feats=None, **kwargs):
         out = super(DenseNet, self).forward_normalize(x)
         out, mixed_targets = super(DenseNet, self).forward_noise_mixup(out, targets, robust_samples, corruptions,
                                         mixup_alpha, mixup_p, manifold, manifold_noise_factor, cutmix_alpha, cutmix_p,
                                         noise_minibatchsize, concurrent_combinations, noise_sparsity,
-                                        noise_patch_lower_scale, noise_patch_upper_scale, generated_ratio)
+                                        noise_patch_lower_scale, noise_patch_upper_scale, generated_ratio, n2n_deepaugment, 
+                                        style_feats, **kwargs)
         out = self.dense4(out)
         out = F.avg_pool2d(F.relu(self.bn(out)), 4)
         out = out.view(out.size(0), -1)

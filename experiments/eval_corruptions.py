@@ -39,20 +39,29 @@ def compute_p_corruptions(testloader, model, test_corruptions, dataset):
         acc = 100.*correct/total
         return acc
 
-def compute_c_corruptions(dataset, testsets_c, model, batchsize, num_classes, eval_run = False):
+def compute_c_corruptions(dataset, testsets_c, model, batchsize, num_classes, valid_run = False, workers = 0):
+
+    from data import seed_worker
+
     accs_c, rmsce_c_list = [], []
-    if eval_run == False:
+    if valid_run == False:
         print(f"Testing on {dataset}-c/c-bar Benchmark")
 
+    t = torch.Generator()
+    t.manual_seed(0) #ensure that the same testset is always used when we are not working with the fixed benchmarks
+
     for corruption, corruption_testset in testsets_c.items():
-        testloader_c = DataLoader(corruption_testset, batch_size=batchsize, shuffle=False, pin_memory=True, num_workers=0)
+        workers = workers if corruption in ['combined', 'caustic_refraction', 'perlin_noise', 'plasma_noise', 'sparkles'] else 0 #compute heavier corruptions
+
+        testloader_c = DataLoader(corruption_testset, batch_size=batchsize, shuffle=False, pin_memory=True, num_workers=workers, 
+                                  worker_init_fn=seed_worker, generator=t)
         acc, rmsce_c = compute_c(testloader_c, model, num_classes)
         accs_c.append(acc)
         rmsce_c_list.append(rmsce_c)
-        if eval_run == False:
+        if valid_run == False:
             print(acc, f"% mean (avg. over 5 intensities) Accuracy on {dataset}-c corrupted data of type", corruption)
 
-    if eval_run == False:
+    if valid_run == False:
         rmsce_c = np.average(np.asarray(rmsce_c_list))
         print("Robust Accuracy C-all (19 corruptions): ", sum(accs_c[0:19]) / 19, "%,"
             "Robust Accuracy C-original (15 corruptions): ", sum(accs_c[0:15]) / 15, "%, "

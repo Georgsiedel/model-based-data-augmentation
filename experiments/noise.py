@@ -90,12 +90,8 @@ def apply_noise_add_and_mult(batch, minibatchsize, corruptions, normalized, data
     minibatches = batch.view(-1, minibatchsize, batch.size()[1], batch.size()[2], batch.size()[3])
     new_batches = []
     for id, minibatch in enumerate(minibatches):
-        #no dict means corruption combination, so we choose randomly, dict means one single corruption
-        if not isinstance(corruptions, dict): #in case of a combination of corruptions (combined_corruption = True)
-            corruptions_list = random.sample(list(corruptions), k=2)
-        else:
-            corruptions_list = [corruptions]
-
+        
+        corruptions_list = random.sample(list(corruptions), k=2)
         clean = minibatch.clone()
 
         for id, (corruption) in enumerate(corruptions_list):
@@ -247,11 +243,7 @@ def apply_noise(batch, minibatchsize, corruptions, concurrent_combinations, norm
     minibatches = chain(full_minibatches, [residual_batch] if residual_batch is not None else [])
 
     for id, minibatch in enumerate(minibatches):
-        #no dict means corruption combination, so we choose randomly, dict means one single corruption
-        if not isinstance(corruptions, dict): #in case of a combination of corruptions (combined_corruption = True)
-            corruptions_list = random.sample(list(corruptions), k=concurrent_combinations)
-        else:
-            corruptions_list = [corruptions]
+        corruptions_list = random.sample(list(corruptions), k=concurrent_combinations)
 
         #noisy_minibatch = torch.clone(minibatch)
         for _, (corruption) in enumerate(corruptions_list):
