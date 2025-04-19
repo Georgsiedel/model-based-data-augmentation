@@ -159,6 +159,11 @@ def train_epoch(pbar):
             if content_batch_size != style_batch_size:
                 style_feats = style_feats[:content_batch_size]
 
+        if args.int_adain_params.get("moex_mode", False):
+            print("Moment Exchange Applied")
+            random_indices = torch.randperm(input.size(0))
+            style_feats = input[random_indices]
+
         else:
             style_feats = None
         with torch.amp.autocast(device_type=device):
