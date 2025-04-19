@@ -1,14 +1,15 @@
 from experiments.utils import plot_images
 import torch.nn as nn
+import torch
 import numpy as np
 from experiments.mixup import mixup_process
 from experiments.noise import apply_noise, noise_up, apply_noise_add_and_mult
 from experiments.data import normalization_values
-import torch
+from experiments.deepaugment_n2n import N2N_DeepAugment
 
 
 class CtModel(nn.Module):
-    def __init__(self, dataset, normalized, num_classes, **kwargs):
+    def __init__(self, dataset, normalized, num_classes):
         super(CtModel, self).__init__()
         self.normalized = normalized
         self.num_classes = num_classes
@@ -24,10 +25,42 @@ class CtModel(nn.Module):
             self.register_buffer("mu", self.mean)
             self.register_buffer("sigma", self.std)
 
+        self.deepaugment_instance = None
+
     def forward_normalize(self, x):
         if self.normalized:
             x = (x - self.mu) / self.sigma
         return x
+    
+    def noise_mixup(self, out, targets, robust_samples, corruptions, mixup_alpha, mixup_p, cutmix_alpha, cutmix_p, noise_minibatchsize,
+                            concurrent_combinations, noise_sparsity, noise_patch_lower_scale, noise_patch_upper_scale,
+                            generated_ratio, n2n_deepaugment):
+
+        #define where mixup is applied. k=0 is in the input space, k>0 is in the embedding space (manifold mixup)
+        if self.training == False: k = -1
+        else: k = 0
+
+        if k == 0:  # Do input mixup if k is 0
+                    
+            if n2n_deepaugment: #apply deepaugment if True
+                if self.deepaugment_instance is None:
+                    self.deepaugment_instance = N2N_DeepAugment(orig_batch_size=out.shape[0], 
+                                                                image_size=out.shape[2], 
+                                                                channels=out.shape[1],
+                                                                noisenet_max_eps=0.75, 
+                                                                ratio=0.5)
+                out = self.deepaugment_instance(out)
+            mixed_out, targets = mixup_process(out, targets, robust_samples, self.num_classes, mixup_alpha, mixup_p,
+                                         cutmix_alpha, cutmix_p, generated_ratio, manifold=False, inplace=True)
+            noisy_out = apply_noise(mixed_out, noise_minibatchsize, corruptions, concurrent_combinations,
+                                                            self.normalized, self.dataset,
+                                                            manifold=False, manifold_factor=1, noise_sparsity=noise_sparsity,
+                                                            noise_patch_lower_scale=noise_patch_lower_scale,
+                                                            noise_patch_upper_scale=noise_patch_upper_scale)
+            out = noisy_out
+            # plot_images(4, self.mean, self.std, noisy_out, noisy_out)
+
+        return out, targets
 
     def forward_noise_mixup(
         self,
@@ -47,11 +80,12 @@ class CtModel(nn.Module):
         noise_patch_lower_scale,
         noise_patch_upper_scale,
         generated_ratio,
+        n2n_deepaugment,
         style_feats,
         **kwargs,
     ):
-        if style_norm_type := kwargs.get("type", None):
-            int_adain_probability = kwargs.get("probability", 0.0)
+        if style_norm_type := kwargs.get("norm_type", None):
+            int_adain_probability = kwargs.get("style_probability", 0.0)
 
         # define where mixup is applied. k=0 is in the input space, k>0 is in the embedding space (manifold mixup)
         if self.training == False:
@@ -61,53 +95,46 @@ class CtModel(nn.Module):
         else:
             k = 0
 
-        if k == 0:  # Do input mixup if k is 0
-            mixed_out, targets = mixup_process(
-                out,
-                targets,
-                robust_samples,
-                self.num_classes,
-                mixup_alpha,
-                mixup_p,
-                cutmix_alpha,
-                cutmix_p,
-                generated_ratio,
-                manifold=False,
-                inplace=True,
-            )
-            noisy_out = apply_noise(
-                mixed_out,
-                noise_minibatchsize,
-                corruptions,
-                concurrent_combinations,
-                self.normalized,
-                self.dataset,
-                manifold=False,
-                manifold_factor=1,
-                noise_sparsity=noise_sparsity,
-                noise_patch_lower_scale=noise_patch_lower_scale,
-                noise_patch_upper_scale=noise_patch_upper_scale,
-            )
+        if k == 0:  # Do deepaugemtn, input mixup and noise injection if k is 0
+                    
+            if n2n_deepaugment: #apply deepaugment if True
+                if self.deepaugment_instance is None:
+                    self.deepaugment_instance = N2N_DeepAugment(orig_batch_size=out.shape[0], 
+                                                                image_size=out.shape[2], 
+                                                                channels=out.shape[1],
+                                                                noisenet_max_eps=0.75, 
+                                                                ratio=0.5)
+                out = self.deepaugment_instance(out)
+            mixed_out, targets = mixup_process(out, targets, robust_samples, self.num_classes, mixup_alpha, mixup_p,
+                                         cutmix_alpha, cutmix_p, generated_ratio, manifold=False, inplace=True)
+            noisy_out = apply_noise(mixed_out, noise_minibatchsize, corruptions, concurrent_combinations,
+                                                            self.normalized, self.dataset,
+                                                            manifold=False, manifold_factor=1, noise_sparsity=noise_sparsity,
+                                                            noise_patch_lower_scale=noise_patch_lower_scale,
+                                                            noise_patch_upper_scale=noise_patch_upper_scale)
             out = noisy_out
             # plot_images(4, self.mean, self.std, noisy_out, noisy_out)
 
         out = self.blocks[0](out)
+
         if style_feats is not None:
             style_feats = self.blocks[0](style_feats)
+
         prob = torch.rand(1).item()
+
         for i, ResidualBlock in enumerate(self.blocks[1:]):
             if style_norm_type == "pono":
                 if prob < int_adain_probability and i == 0:
-                    out = self.internal_adain(out, style_feats)
-                    print("[TEST] PoNo Applied")
+                    out = self.pono(out, style_feats)
+
             out = ResidualBlock(out)
-            # TODO: Add Moment Exchange
+
             if style_norm_type == "int_adain":
                 if prob < int_adain_probability and i == 0:
                     # style_feats = self.blocks[0](style_feats)
                     style_feats = ResidualBlock(style_feats)
                     out = self.internal_adain(out, style_feats)
-                    print("[TEST] Internal AdaIN applied")
+                    
             if k == (i + 1):  # Do manifold mixup if k is greater 0
                 out, targets = mixup_process(
                     out,
