@@ -1,6 +1,6 @@
 import numpy as np
 
-# CIFAR10 with PONO (Style), with gen data, without TA
+# CIFAR100 with PONO (Style), without gen data, without TA
 
 train_corruptions = np.array(
     [
@@ -24,8 +24,8 @@ concurrent_combinations = 1  # only has an effect if combine_train_corruption is
 
 batchsize = 256
 minibatchsize = 8
-dataset = "CIFAR10"  # ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
-generated_ratio = 0.5
+dataset = "CIFAR100"  # ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
+generated_ratio = 0.0
 normalize = True
 validontest = True
 validonc = True

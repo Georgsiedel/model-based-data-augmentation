@@ -1,6 +1,6 @@
 import numpy as np
 
-# CIFAR10 with PONO (Style), with gen data, without TA
+# CIFAR100 with PONO (Style), with gen data, with TA
 
 train_corruptions = np.array(
     [
@@ -24,7 +24,7 @@ concurrent_combinations = 1  # only has an effect if combine_train_corruption is
 
 batchsize = 256
 minibatchsize = 8
-dataset = "CIFAR10"  # ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
+dataset = "CIFAR100"  # ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
 generated_ratio = 0.5
 normalize = True
 validontest = True
@@ -43,8 +43,12 @@ number_workers = 2
 modeltype = "WideResNet_28_4"
 modelparams = {"dropout_rate": 0.2, "activation_function": "silu"}
 resize = False
-train_aug_strat_orig = "None"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
-train_aug_strat_gen = "None"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+train_aug_strat_orig = (
+    "TrivialAugmentWide"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+)
+train_aug_strat_gen = (
+    "TrivialAugmentWide"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+)
 loss = "CrossEntropyLoss"
 lossparams = {"label_smoothing": 0.1}
 trades_loss = False

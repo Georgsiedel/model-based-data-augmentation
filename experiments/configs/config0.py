@@ -1,62 +1,39 @@
 import numpy as np
 
+# CIFAR10 with Internal AdaIN, without gen data, without TA
+
 train_corruptions = np.array(
     [
-        # {'noise_type': 'standard', 'epsilon': 0.0, 'sphere': False, 'distribution': 'beta2-5'},
+        {
+            "noise_type": "standard",
+            "epsilon": 0.0,
+            "sphere": False,
+            "distribution": "beta2-5",
+        },
         # {'noise_type': 'uniform-linf', 'epsilon': 0.1, 'sphere': False, 'distribution': 'uniform'},
-        {
-            "noise_type": "gaussian",
-            "epsilon": 0.15,
-            "sphere": False,
-            "distribution": "uniform",
-        },
-        {
-            "noise_type": "uniform-l0.5",
-            "epsilon": 400000.0,
-            "sphere": False,
-            "distribution": "uniform",
-        },
-        {
-            "noise_type": "uniform-l1",
-            "epsilon": 200.0,
-            "sphere": False,
-            "distribution": "uniform",
-        },
+        # {'noise_type': 'uniform-l0.5', 'epsilon': 400000.0, 'sphere': False, 'distribution': 'uniform'},
+        # {'noise_type': 'uniform-l1', 'epsilon': 200.0, 'sphere': False, 'distribution': 'uniform'},
         # {'noise_type': 'uniform-l2', 'epsilon': 5.0, 'sphere': False, 'distribution': 'uniform'},
-        # {'noise_type': 'uniform-l5', 'epsilon': 0.6, 'sphere': False, 'distribution': 'uniform'},
-        # {'noise_type': 'uniform-l50', 'epsilon': 0.18, 'sphere': False, 'distribution': 'uniform'},
-        {
-            "noise_type": "uniform-l0-impulse",
-            "epsilon": 0.2,
-            "sphere": False,
-            "distribution": "uniform",
-        },
-        {
-            "noise_type": "uniform-l0-impulse",
-            "epsilon": 0.15,
-            "sphere": True,
-            "distribution": "uniform",
-        },
+        # {'noise_type': 'uniform-l0-impulse', 'epsilon': 0.2, 'sphere': False, 'distribution': 'uniform'},
     ]
 )
 noise_sparsity = 1.0
 noise_patch_scale = {"lower": 0.2, "upper": 0.7}
 combine_train_corruptions = True  # augment the train dataset with all corruptions
 concurrent_combinations = 1  # only has an effect if combine_train_corruption is True
-kaggle = True  # To run the experiments on Kaggle, set this to True
 
-batchsize = 512
+batchsize = 256
 minibatchsize = 8
-dataset = "TinyImageNet"  # ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
-generated_ratio = 0.5
+dataset = "CIFAR10"  # ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
+generated_ratio = 0.0 # Without gen data
 normalize = True
-validontest = True # If True, the model is validated on the validation set. True for final validation. False for hyperparameter tuning.
+validontest = True
 validonc = True
 validonadv = False
 lrschedule = "CosineAnnealingWarmRestarts"
-learningrate = 0.15
-epochs = 5
-lrparams = {"T_0": 30, "T_mult": 2}
+learningrate = 0.1
+epochs = 300
+lrparams = {"T_0": 20, "T_mult": 2}
 warmupepochs = 0
 earlystop = False
 earlystopPatience = 15
@@ -64,21 +41,10 @@ optimizer = "SGD"
 optimizerparams = {"momentum": 0.9, "weight_decay": 1e-4, "nesterov": True}
 number_workers = 2
 modeltype = "WideResNet_28_4"
-modelparams = {
-    "dropout_rate": 0.2,
-    "activation_function": "silu",
-    "internal_adain_prob": 0.5,
-}
+modelparams = {"dropout_rate": 0.2, "activation_function": "silu"}
 resize = False
 train_aug_strat_orig = "None"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 train_aug_strat_gen = "None"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
-aug_strat_check = True
-train_aug_strat_orig = (
-    "TrivialAugmentWide"  # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
-)
-train_aug_strat_gen = (
-   "TrivialAugmentWide"   # TrivialAugmentWide, RandAugment, AutoAugment, AugMix
-)
 loss = "CrossEntropyLoss"
 lossparams = {"label_smoothing": 0.1}
 trades_loss = False
@@ -102,15 +68,15 @@ cutmix = {
     "alpha": 1.0,
     "p": 0.0,
 }  # default alpha 1.0 #If both mixup and cutmix are >0, mixup or cutmix are selected by 0.5 chance
-manifold = {"apply": True, "noise_factor": 3}
-# TODO: Seperate params for internal_adain
+manifold = {"apply": False, "noise_factor": 3}
+RandomEraseProbability = 0.0
+swa = {"apply": True, "start_factor": 0.9, "lr_factor": 0.2}
+kaggle = True
 int_adain_params = {
-    "type": "int_adain",  # int_adain, pono
-    "probability": 0.5,
+    "norm_type": "int_adain",  # int_adain, pono
+    "style_probability": 0.5,
     "style_dir": "/kaggle/input/painter-by-numbers-resized",
 }
-RandomEraseProbability = 0.3
-swa = {"apply": True, "start_factor": 0.85, "lr_factor": 0.2}
 
 # define train and test corruptions:
 # define noise type (first column): 'gaussian', 'uniform-l0-impulse', 'uniform-l0-salt-pepper', 'uniform-linf'. also: all positive numbers p>0 for uniform Lp possible: 'uniform-l1', 'uniform-l2', ...
@@ -436,7 +402,6 @@ adv_distance_params = {
 }
 calculate_autoattack_robustness = False
 autoattack_params = {"setsize": 1000, "epsilon": 8 / 255, "norm": "Linf"}
-
 
 if dataset == "CIFAR10":
     num_classes = 10
