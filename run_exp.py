@@ -7,9 +7,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == "__main__":
-    for experiment in (
-        [422, 385, 394, 395] + list(range(432, 438)) + list(range(362, 367)) + [514]
-    ):
+    for experiment in [0]:
         configname = f"experiments.configs.config{experiment}"
         config = importlib.import_module(configname)
 
