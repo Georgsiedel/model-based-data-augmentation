@@ -24,6 +24,8 @@ def load_models(device, base_path):
 
 def stylize_images(args, device):
     print(f"Loading and sampling {args.num_to_sample} images...")
+    #Set the seed
+    torch.manual_seed(args.seed)
     npz_map = {'c10': args.npz_c10, 'c100': args.npz_c100, 'tin': args.npz_tin}
     npz_path = npz_map[args.dataset]
     save_dir = os.path.join(args.output_dir, f'styled_fid_images/{args.dataset}_{args.num_to_sample}')
@@ -112,6 +114,7 @@ def main():
     parser.add_argument('--npz_tin', default="/kaggle/input/1m-tiny/tiny_edm_1m.npz")
     parser.add_argument('--edm_fid_script', default="/kaggle/working/model-based-data-augmentation/fid/edm/fid.py")
     parser.add_argument('--output_dir', default="/kaggle/working")
+    parser.add_argument('--seed', type=int, default=42, help="Seed for reproducibility")
 
     args = parser.parse_args()
 
