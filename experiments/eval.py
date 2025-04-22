@@ -21,8 +21,6 @@ import data
 import utils
 
 parser = argparse.ArgumentParser(description='PyTorch Robustness Testing')
-parser.add_argument('--resume', type=utils.str2bool, nargs='?', const=False, default=False,
-                    help='resuming evaluation')
 parser.add_argument('--runs', default=1, type=int, help='run number')
 parser.add_argument('--experiment', default=0, type=int,
                     help='experiment number - each experiment is defined in module config{experiment}')

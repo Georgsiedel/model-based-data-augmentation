@@ -7,7 +7,7 @@ torch.cuda.device_count()
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [386,388,374,404,405] + list(range(425,432))+ [41,343,344,345,359,360,361,323,322,321]:
+    for experiment in [405] + list(range(425,432))+ [41,343,344,345,359,360,361,323,322,321]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -20,13 +20,13 @@ if __name__ == '__main__':
         if experiment in [386,388]:
             runs = 3
             run_iter =[1,2]
-        if experiment in []:
+        if experiment in [405]:
             runs = 3
             run_iter =[2]
 
         for run in run_iter:
 
-            resume = True if experiment in [386] and run in [1] else False
+            resume = True if experiment in [405] and run in [2] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
@@ -52,7 +52,7 @@ if __name__ == '__main__':
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
         print('Beginning metric evaluation')
-        cmdeval = f"python experiments/eval.py --resume={resume} --experiment={experiment} --runs={runs} --batchsize={1000} " \
+        cmdeval = f"python experiments/eval.py --experiment={experiment} --runs={runs} --batchsize={1000} " \
                 f"--dataset={config.dataset} --modeltype={config.modeltype} --modelparams=\"{config.modelparams}\" " \
                 f"--resize={config.resize} --combine_test_corruptions={config.combine_test_corruptions} --number_workers={config.number_workers} " \
                 f"--normalize={config.normalize} --test_on_c={config.test_on_c} " \

@@ -7,7 +7,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 if __name__ == '__main__':
 
-    for experiment in [422,385,394,395] + list(range(432,438)) + list(range(362,367)) + [514]:
+    for experiment in [395] + list(range(432,438)) + list(range(362,367)) + [514]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -20,13 +20,13 @@ if __name__ == '__main__':
         if experiment in [422]:
             runs = 3
             run_iter =[1,2]
-        if experiment in []:
+        if experiment in [395]:
             runs = 3
-            run_iter =[2]
+            run_iter =[]
 
         for run in run_iter:
 
-            resume = True if experiment in [422,514] and run in [1,0] else False
+            resume = True if experiment in [432] and run in [0] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
         # Calculate accuracy and robustness
         print('Beginning metric evaluation')
-        cmdeval = f"python experiments/eval.py --resume={resume} --experiment={experiment} --runs={runs} --batchsize={1000} " \
+        cmdeval = f"python experiments/eval.py --experiment={experiment} --runs={runs} --batchsize={1000} " \
                 f"--dataset={config.dataset} --modeltype={config.modeltype} --modelparams=\"{config.modelparams}\" " \
                 f"--resize={config.resize} --combine_test_corruptions={config.combine_test_corruptions} --number_workers={config.number_workers} " \
                 f"--normalize={config.normalize} --test_on_c={config.test_on_c} " \
