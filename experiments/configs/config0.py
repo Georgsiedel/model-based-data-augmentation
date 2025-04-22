@@ -78,6 +78,7 @@ int_adain_params = {
     "style_dir": "/kaggle/input/painter-by-numbers-resized",
     "moex_mode": True,
 }
+n2n_deepaugment = False
 
 # define train and test corruptions:
 # define noise type (first column): 'gaussian', 'uniform-l0-impulse', 'uniform-l0-salt-pepper', 'uniform-linf'. also: all positive numbers p>0 for uniform Lp possible: 'uniform-l1', 'uniform-l2', ...
