@@ -3,6 +3,7 @@ import sys
 import argparse
 import numpy as np
 import torch
+import random
 from tqdm import tqdm
 from PIL import Image
 from torchvision.datasets import CIFAR10, CIFAR100, ImageFolder
@@ -26,6 +27,8 @@ def stylize_images(args, device):
     print(f"Loading and sampling {args.num_to_sample} images...")
     #Set the seed
     torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
     npz_map = {'c10': args.npz_c10, 'c100': args.npz_c100, 'tin': args.npz_tin}
     npz_path = npz_map[args.dataset]
     save_dir = os.path.join(args.output_dir, f'styled_fid_images/{args.dataset}_{args.num_to_sample}')
