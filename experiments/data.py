@@ -753,7 +753,7 @@ class DataLoading:
             self.robust_samples,
         )
 
-    def load_data_c(self, subset, subsetsize):
+    def load_data_c(self, subset, subsetsize, valid_run=False):
         c_datasets = []
         # c-corruption benchmark: https://github.com/hendrycks/robustness
         current_dir = os.path.dirname(__file__)
@@ -801,6 +801,7 @@ class DataLoading:
                         10000, subsetsize, replace=False
                     )
                     subtestset = Subset(self.testset, selected_indices)
+                    
                     np_data_c = [
                         intensity_dataset[selected_indices]
                         for intensity_dataset in np_data_c
