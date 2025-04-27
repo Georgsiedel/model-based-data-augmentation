@@ -206,7 +206,6 @@ if __name__ == "__main__":
         # Load data
         Dataloader = data.DataLoading(
             dataset=args.dataset,
-            validontest=args.validontest,
             generated_ratio=0.0,
             resize=args.resize,
             run=run,
