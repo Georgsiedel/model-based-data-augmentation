@@ -209,7 +209,6 @@ if __name__ == "__main__":
             generated_ratio=0.0,
             resize=args.resize,
             run=run,
-            number_workers=args.number_workers,
             kaggle=args.kaggle,
         )
         Dataloader.create_transforms(

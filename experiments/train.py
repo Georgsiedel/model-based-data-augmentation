@@ -264,7 +264,7 @@ if __name__ == '__main__':
 
     Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run, args.number_workers, kaggle=args.kaggle)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
-    Dataloader.load_base_data()
+    Dataloader.load_base_data(validontest=False)
     testsets_c = Dataloader.load_data_c(subset=True, subsetsize=100, valid_run=True) if args.validonc else None
 
     # Construct model
