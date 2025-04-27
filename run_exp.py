@@ -45,7 +45,7 @@ if __name__ == "__main__":
                 f" --normalize={config.normalize} --minibatchsize="
                 f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa="
                 f'"{config.swa}" --noise_sparsity={config.noise_sparsity} --noise_patch_scale='
-                f'"{config.noise_patch_scale}" --generated_ratio={config.generated_ratio} --n2n_deepaugment={config.n2n_deepaugment}'
+                f'"{config.noise_patch_scale}" --generated_ratio={config.generated_ratio} --n2n_deepaugment={config.n2n_deepaugment} --kaggle={config.kaggle} --int_adain_params="{config.int_adain_params}"'
             )
             os.system(cmd0)
 
@@ -58,6 +58,6 @@ if __name__ == "__main__":
             f"--normalize={config.normalize} --test_on_c={config.test_on_c} "
             f'--calculate_adv_distance={config.calculate_adv_distance} --adv_distance_params="{config.adv_distance_params}" '
             f"--calculate_autoattack_robustness={config.calculate_autoattack_robustness} --autoattack_params="
-            f'"{config.autoattack_params}" --validontest={config.validontest}'
+            f'"{config.autoattack_params}" --validontest={config.validontest} --kaggle={config.kaggle} '
         )
         os.system(cmdeval)

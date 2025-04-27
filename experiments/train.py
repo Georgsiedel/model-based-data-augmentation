@@ -115,6 +115,8 @@ parser.add_argument('--generated_ratio', default=0.0, type=float, help='ratio of
                     'into every training batch')
 parser.add_argument('--n2n_deepaugment', type=utils.str2bool, nargs='?', const=False, default=False,
                     help='Whether to apply DeepAugment according to https://github.com/hendrycks/imagenet-r')
+parser.add_argument('--kaggle', type=utils.str2bool, nargs='?', const=False, default=False,
+                    help='Whether to run on Kaggle or locally.')
 parser.add_argument(
     "--int_adain_params",
     default={},
@@ -260,7 +262,7 @@ if __name__ == '__main__':
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams
     criterion = losses.Criterion(args.loss, trades_loss=args.trades_loss, robust_loss=args.robust_loss, **lossparams)
 
-    Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run, args.number_workers)
+    Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run, args.number_workers, kaggle=args.kaggle)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
     Dataloader.load_base_data(test_only=False)
     testsets_c = Dataloader.load_data_c(subset=True, subsetsize=100, valid_run=True) if args.validonc else None
@@ -289,6 +291,11 @@ if __name__ == '__main__':
     else:
         swa_model, swa_scheduler = None, None
     Scaler = torch.amp.GradScaler(device=device)
+    if args.kaggle:
+        checkpoint_dir = "/kaggle/working/model-based-data-augmentation/trained_models"
+    else:
+        checkpoint_dir = "../trained_models"
+
     Checkpointer = utils.Checkpoint(args.dataset, args.modeltype, args.experiment,
                                     train_corruptions, args.run, earlystopping=args.earlystop, patience=args.earlystopPatience,
                                     verbose=False,  checkpoint_path=f'../trained_models/checkpoint_{args.experiment}_{args.run}.pt')
