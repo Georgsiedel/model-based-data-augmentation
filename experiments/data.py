@@ -131,6 +131,7 @@ class DataLoading:
     def __init__(
         self,
         dataset,
+        validontest=False,
         epochs=200,
         generated_ratio=0.0,
         resize=False,
