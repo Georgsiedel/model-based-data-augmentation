@@ -7,7 +7,7 @@ torch.cuda.device_count()
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [405] + list(range(425,432))+ [41,343,344,345,359,360,361,323,322,321]:
+    for experiment in [320,471,472,473]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -17,16 +17,13 @@ if __name__ == '__main__':
         runs = 3
         run_iter = [0,1,2] 
 
-        if experiment in [386,388]:
-            runs = 3
-            run_iter =[1,2]
-        if experiment in [405]:
+        if experiment in [320]:
             runs = 3
             run_iter =[2]
 
         for run in run_iter:
 
-            resume = True if experiment in [405] and run in [2] else False
+            resume = True if experiment in [320] and run in [2] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
