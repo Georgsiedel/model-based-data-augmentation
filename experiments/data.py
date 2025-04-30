@@ -25,19 +25,8 @@ import experiments.custom_transforms as custom_transforms
 from run_exp import device
 import gc
 from experiments.utils import plot_images, CsvHandler
-from experiments.custom_datasets import (
-    SubsetWithTransform,
-    GeneratedDataset,
-    AugmentedDataset,
-    ListDataset,
-    CustomDataset,
-)
-from experiments.custom_datasets import (
-    BalancedRatioSampler,
-    GroupedAugmentedDataset,
-    ReproducibleBalancedRatioSampler,
-    StyleDataset,
-)
+from experiments.custom_datasets import SubsetWithTransform, GeneratedDataset, AugmentedDataset, ListDataset, CustomDataset
+from experiments.custom_datasets import BalancedRatioSampler, GroupedAugmentedDataset, ReproducibleBalancedRatioSampler, StyleDataset
 
 
 def normalization_values(batch, dataset, normalized, manifold=False, manifold_factor=1):
@@ -816,7 +805,7 @@ class DataLoading:
                         10000, subsetsize, replace=False
                     )
                     subtestset = Subset(self.testset, selected_indices)
-
+                    
                     np_data_c = [
                         intensity_dataset[selected_indices]
                         for intensity_dataset in np_data_c
@@ -910,63 +899,67 @@ class DataLoading:
 
         return self.c_datasets_dict
 
-    def get_loader(self, batchsize, number_workers):
-        self.number_workers = number_workers
+    def get_loader(self, batchsize):
+
         self.batchsize = batchsize
 
         g = torch.Generator()
         g.manual_seed(self.epoch + self.epochs * self.run)
 
         if self.generated_ratio > 0.0:
-            self.CustomSampler = BalancedRatioSampler(
-                self.trainset,
-                generated_ratio=self.generated_ratio,
-                batch_size=batchsize,
-            )
+            self.CustomSampler = BalancedRatioSampler(self.trainset, generated_ratio=self.generated_ratio,
+                                                 batch_size=batchsize)
         else:
-            self.CustomSampler = BatchSampler(
-                RandomSampler(self.trainset), batch_size=batchsize, drop_last=False
-            )
+            self.CustomSampler = BatchSampler(RandomSampler(self.trainset), batch_size=batchsize, drop_last=False)
 
-        self.trainloader = DataLoader(
-            self.trainset,
-            pin_memory=True,
-            batch_sampler=self.CustomSampler,
-            num_workers=number_workers,
-            worker_init_fn=seed_worker,
-            generator=g,
-            persistent_workers=True,
-        )
+        self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
+                                      num_workers=self.number_workers, worker_init_fn=seed_worker, 
+                                        generator=g, persistent_workers=False)
+        
+        val_workers = self.number_workers if self.dataset=='ImageNet' else 0
+        self.testloader = DataLoader(self.testset, batch_size=batchsize, pin_memory=True, num_workers=val_workers)
 
-        self.validationloader = DataLoader(
-            self.validset, batch_size=batchsize, pin_memory=False, num_workers=0
-        )
+        return self.trainloader, self.testloader
 
-        return self.trainloader, self.validationloader
+    def update_set(self, epoch, start_epoch):
 
-    def update_trainset(self, epoch, start_epoch):
-        if (
-            (
-                self.generated_ratio != 0.0
-                or self.stylization_gen is not None
-                or self.stylization_orig is not None
-            )
-            and epoch != 0
-            and epoch != start_epoch
-        ):
-            self.load_augmented_traindata(
-                self.target_size, epoch=epoch, robust_samples=self.robust_samples
-            )
+        if (self.generated_ratio != 0.0 or self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
+                        
+            del self.trainset
+
+            self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
+        
+        del self.trainloader
+        gc.collect()
 
         g = torch.Generator()
         g.manual_seed(self.epoch + self.epochs * self.run)
-        self.trainloader = DataLoader(
-            self.trainset,
-            batch_sampler=self.CustomSampler,
-            pin_memory=True,
-            num_workers=self.number_workers,
-            worker_init_fn=seed_worker,
-            generator=g,
-            persistent_workers=True,
-        )
+        self.trainloader = DataLoader(self.trainset, batch_sampler=self.CustomSampler, pin_memory=True, 
+                                      num_workers=self.number_workers, worker_init_fn=seed_worker,
+                                      generator=g, persistent_workers=False)
+        
         return self.trainloader
+
+
+
+    def update_set_grouped(self, epoch, start_epoch):
+
+        if (self.generated_ratio != 0.0) and epoch != 0 and epoch != start_epoch:
+            self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
+        elif (self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
+            self.trainset.set_epoch(epoch)
+
+
+    def get_loader_grouped(self, batchsize):
+        self.batchsize = batchsize
+
+        g = torch.Generator()
+        g.manual_seed(self.epoch + self.epochs * self.run)
+
+
+    def load_augmented_traindata_grouped(self, target_size, epoch=0, robust_samples=0):
+        self.robust_samples = robust_samples
+        self.target_size = target_size
+        self.generated_dataset = np.load(os.path.abspath(f'../data/{self.dataset}-add-1m-dm.npz'),
+                                    mmap_mode='r') if self.generated_ratio > 0.0 else None
+        self.epoch = epoch
