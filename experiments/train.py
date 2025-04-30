@@ -538,13 +538,13 @@ if __name__ == "__main__":
     )
 
     Dataloader = data.DataLoading(
-        args.dataset,
-        args.validontest,
-        args.epochs,
-        args.generated_ratio,
-        args.resize,
-        args.run,
-        args.number_workers,
+        dataset=args.dataset,
+        validontest=args.validontest,
+        epochs=args.epochs,
+        resize=args.resize,
+        run=args.run,
+        number_workers=args.number_workers,
+        generated_ratio=args.generated_ratio,
         kaggle=args.kaggle,
     )
     Dataloader.create_transforms(
