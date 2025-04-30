@@ -106,27 +106,6 @@ class SwaLoader:
         return swa_dataloader
 
 
-class CustomDataset(Dataset):
-    def __init__(self, np_images, original_dataset, resize):
-        # Load images
-        self.images = torch.from_numpy(np_images).permute(0, 3, 1, 2) / 255
-        if resize == True:
-            self.images = transforms.Resize(224, antialias=True)(self.images)
-
-        # Extract labels from the original PyTorch dataset
-        self.labels = [label for _, label in original_dataset]
-
-    def __len__(self):
-        return len(self.labels)
-
-    def __getitem__(self, index):
-        # Get image and label for the given index
-        image = self.images[index]
-        label = self.labels[index]
-
-        return image, label
-
-
 class DataLoading:
     def __init__(
         self,
