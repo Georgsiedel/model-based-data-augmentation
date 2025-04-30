@@ -545,6 +545,7 @@ class DataLoading:
         run=0,
         test_only=False,
         factor=1,
+        number_workers=0,
         kaggle=False,
     ):
         self.dataset = dataset
@@ -554,6 +555,7 @@ class DataLoading:
         self.epochs = epochs
         self.test_only = test_only
         self.factor = factor
+        self.number_workers = number_workers
         self.kaggle = kaggle
 
         if self.kaggle:
