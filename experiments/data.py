@@ -354,6 +354,9 @@ class BalancedRatioSampler(Sampler):
     def __iter__(self):
         # Create a single permutation for the whole epoch.
         # generated permutation requires generated images appended to the back of the dataset!
+        print(
+            f"generated images: {self.num_generated}, original images: {self.num_original}, batch size: {self.batch_size}, generated images in batch: {self.num_generated_batch}, original images in batch: {self.num_original_batch}"
+        )
         original_perm = torch.randperm(self.num_original)
         generated_perm = torch.randperm(self.num_generated) + self.num_original
 
