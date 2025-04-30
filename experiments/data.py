@@ -514,6 +514,10 @@ class DataLoading:
         g = torch.Generator()
         g.manual_seed(self.epoch + self.epochs * self.run)
 
+        print(
+            f"[GET_LOADER] Batchsize: {batchsize}, Generated ratio: {self.generated_ratio}, Epoch: {self.epoch}, Run: {self.run}"
+        )
+
         if self.generated_ratio > 0.0:
             self.CustomSampler = BalancedRatioSampler(
                 self.trainset,
