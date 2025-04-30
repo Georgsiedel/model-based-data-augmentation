@@ -287,11 +287,7 @@ class DataLoading:
         self.robust_samples = robust_samples
         self.target_size = target_size
         if self.kaggle:
-            self.generated_dataset = (
-                np.load(self.gen_path, mmap_mode="r")
-                if self.generated_ratio > 0.0
-                else None
-            )
+            self.generated_dataset = np.load(self.gen_path, mmap_mode="r")
         else:
             self.generated_dataset = (
                 np.load(
@@ -304,6 +300,7 @@ class DataLoading:
         self.epoch = epoch
 
         torch.manual_seed(self.epoch + self.epochs * self.run)
+        torch.cuda.manual_seed(self.epoch + self.epochs * self.run)
         np.random.seed(self.epoch + self.epochs * self.run)
         random.seed(self.epoch + self.epochs * self.run)
 
@@ -311,53 +308,54 @@ class DataLoading:
         self.num_original = target_size - self.num_generated
 
         if self.num_original > 0:
-            original_indices = torch.randperm(len(self.base_trainset))[
-                : self.num_original
-            ]
-            original_subset = Subset(self.base_trainset, original_indices)
+            original_indices = torch.randperm(self.target_size)[: self.num_original]
+            original_subset = SubsetWithTransform(
+                Subset(self.base_trainset, original_indices), self.transforms_preprocess
+            )
+
             if self.stylization_orig is not None:
                 stylized_original_subset, style_mask_orig = self.stylization_orig(
                     original_subset
                 )
             else:
-                stylized_original_subset, style_mask_orig = None, None
+                stylized_original_subset, style_mask_orig = (
+                    original_subset,
+                    [False] * len(original_subset),
+                )
         else:
-            original_subset, stylized_original_subset, style_mask_orig = (
-                None,
-                None,
-                None,
-            )
+            stylized_original_subset, style_mask_orig = None, []
 
         if self.num_generated > 0 and self.generated_dataset is not None:
-            generated_indices = torch.randperm(len(self.generated_dataset["image"]))[
-                : self.num_generated
-            ]
-            generated_subset = {
-                "images": self.generated_dataset["image"][generated_indices],
-                "labels": self.generated_dataset["label"][generated_indices],
-            }
+            generated_indices = np.random.choice(
+                len(self.generated_dataset["label"]),
+                size=self.num_generated,
+                replace=False,
+            )
+
+            generated_subset = GeneratedDataset(
+                self.generated_dataset["image"][generated_indices],
+                self.generated_dataset["label"][generated_indices],
+                transform=self.transforms_preprocess,
+            )
 
             if self.stylization_gen is not None:
                 stylized_generated_subset, style_mask_gen = self.stylization_gen(
                     generated_subset
                 )
             else:
-                stylized_generated_subset, style_mask_gen = None, None
+                stylized_generated_subset, style_mask_gen = (
+                    generated_subset,
+                    [False] * len(generated_subset),
+                )
         else:
-            generated_subset, stylized_generated_subset, style_mask_gen = (
-                None,
-                None,
-                None,
-            )
+            stylized_generated_subset, style_mask_gen = None, []
+
+        style_mask = style_mask_orig + style_mask_gen
 
         self.trainset = AugmentedDataset(
-            original_subset,
             stylized_original_subset,
-            generated_subset,
             stylized_generated_subset,
-            style_mask_orig,
-            style_mask_gen,
-            self.transforms_preprocess,
+            style_mask,
             self.transforms_basic,
             self.transforms_orig_after_style,
             self.transforms_gen_after_style,
