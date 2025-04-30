@@ -662,9 +662,7 @@ if __name__ == "__main__":
             epoch=start_epoch,
             robust_samples=criterion.robust_samples,
         )
-        trainloader, validationloader = Dataloader.get_loader(
-            args.batchsize, number_workers=args.number_workers
-        )
+        trainloader, validationloader = Dataloader.get_loader(args.batchsize)
 
         if style_dir := args.int_adain_params.get("style_dir", None):
             style_dataloader = Dataloader.load_style_dataloader(
