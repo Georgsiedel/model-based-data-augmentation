@@ -689,242 +689,232 @@ class DataLoading:
 
         self.num_classes = len(self.testset.classes)
 
-        def load_augmented_traindata(self, target_size, epoch=0, robust_samples=0):
-            self.robust_samples = robust_samples
-            self.target_size = target_size
-            if self.kaggle:
-                self.generated_dataset = (
-                    np.load(self.gen_path, mmap_mode="r")
-                    if self.generated_ratio > 0.0
-                    else None
+    def load_augmented_traindata(self, target_size, epoch=0, robust_samples=0):
+        self.robust_samples = robust_samples
+        self.target_size = target_size
+        if self.kaggle:
+            self.generated_dataset = (
+                np.load(self.gen_path, mmap_mode="r")
+                if self.generated_ratio > 0.0
+                else None
+            )
+        else:
+            self.generated_dataset = (
+                np.load(
+                    os.path.abspath(f"../data/{self.dataset}-add-1m-dm.npz"),
+                    mmap_mode="r",
+                )
+                if self.generated_ratio > 0.0
+                else None
+            )
+        self.epoch = epoch
+
+        torch.manual_seed(self.epoch + self.epochs * self.run)
+        np.random.seed(self.epoch + self.epochs * self.run)
+        random.seed(self.epoch + self.epochs * self.run)
+
+        self.num_generated = int(target_size * self.generated_ratio)
+        self.num_original = target_size - self.num_generated
+
+        if self.num_original > 0:
+            original_indices = torch.randperm(len(self.base_trainset))[
+                : self.num_original
+            ]
+            original_subset = Subset(self.base_trainset, original_indices)
+            if self.stylization_orig is not None:
+                stylized_original_subset, style_mask_orig = self.stylization_orig(
+                    original_subset
                 )
             else:
-                self.generated_dataset = (
-                    np.load(
-                        os.path.abspath(f"../data/{self.dataset}-add-1m-dm.npz"),
-                        mmap_mode="r",
-                    )
-                    if self.generated_ratio > 0.0
-                    else None
-                )
-            self.epoch = epoch
-
-            torch.manual_seed(self.epoch + self.epochs * self.run)
-            np.random.seed(self.epoch + self.epochs * self.run)
-            random.seed(self.epoch + self.epochs * self.run)
-
-            self.num_generated = int(target_size * self.generated_ratio)
-            self.num_original = target_size - self.num_generated
-
-            if self.num_original > 0:
-                original_indices = torch.randperm(len(self.base_trainset))[
-                    : self.num_original
-                ]
-                original_subset = Subset(self.base_trainset, original_indices)
-                if self.stylization_orig is not None:
-                    stylized_original_subset, style_mask_orig = self.stylization_orig(
-                        original_subset
-                    )
-                else:
-                    stylized_original_subset, style_mask_orig = None, None
-            else:
-                original_subset, stylized_original_subset, style_mask_orig = (
-                    None,
-                    None,
-                    None,
-                )
-
-            if self.num_generated > 0 and self.generated_dataset is not None:
-                generated_indices = torch.randperm(
-                    len(self.generated_dataset["image"])
-                )[: self.num_generated]
-                generated_subset = {
-                    "images": self.generated_dataset["image"][generated_indices],
-                    "labels": self.generated_dataset["label"][generated_indices],
-                }
-
-                if self.stylization_gen is not None:
-                    stylized_generated_subset, style_mask_gen = self.stylization_gen(
-                        generated_subset
-                    )
-                else:
-                    stylized_generated_subset, style_mask_gen = None, None
-            else:
-                generated_subset, stylized_generated_subset, style_mask_gen = (
-                    None,
-                    None,
-                    None,
-                )
-
-            self.trainset = AugmentedDataset(
-                original_subset,
-                stylized_original_subset,
-                generated_subset,
-                stylized_generated_subset,
-                style_mask_orig,
-                style_mask_gen,
-                self.transforms_preprocess,
-                self.transforms_basic,
-                self.transforms_orig_after_style,
-                self.transforms_gen_after_style,
-                self.transforms_orig_after_nostyle,
-                self.transforms_gen_after_nostyle,
-                self.robust_samples,
+                stylized_original_subset, style_mask_orig = None, None
+        else:
+            original_subset, stylized_original_subset, style_mask_orig = (
+                None,
+                None,
+                None,
             )
 
-            def load_data_c(self, subset, subsetsize, valid_run=False):
-                c_datasets = []
-                # c-corruption benchmark: https://github.com/hendrycks/robustness
-                current_dir = os.path.dirname(__file__)
-                c_path = os.path.join(current_dir, "../data/c-labels.txt")
-                corruptions_c = np.asarray(
-                    np.loadtxt(c_path, dtype=list)
-                )  # CHANGE for Kaggle
+        if self.num_generated > 0 and self.generated_dataset is not None:
+            generated_indices = torch.randperm(len(self.generated_dataset["image"]))[
+                : self.num_generated
+            ]
+            generated_subset = {
+                "images": self.generated_dataset["image"][generated_indices],
+                "labels": self.generated_dataset["label"][generated_indices],
+            }
 
-                if self.dataset == "CIFAR10" or self.dataset == "CIFAR100":
-                    # c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
-                    c_bar_path = os.path.join(
-                        current_dir, "../data/c-bar-labels-cifar.txt"
-                    )
-                    corruptions_bar = np.asarray(
-                        np.loadtxt(c_bar_path, dtype=list)
-                    )  # CHANGE for Kaggle
-                    corruptions = [(string, "c") for string in corruptions_c] + [
-                        (string, "c-bar") for string in corruptions_bar
-                    ]
+            if self.stylization_gen is not None:
+                stylized_generated_subset, style_mask_gen = self.stylization_gen(
+                    generated_subset
+                )
+            else:
+                stylized_generated_subset, style_mask_gen = None, None
+        else:
+            generated_subset, stylized_generated_subset, style_mask_gen = (
+                None,
+                None,
+                None,
+            )
 
-                    for corruption, set in corruptions:
-                        subtestset = self.testset
-                        if self.kaggle:
-                            # np_data_c = np.concatenate(np.load(os.path.abspath(f'{self.corrupt_path}/{corruption}.npy')), np.load(os.path.abspath(f'{self.corrupt_path}-bar/{corruption}.npy')), axis=0)
-                            # corrupt_file_dir = f'{self.corrupt_path}/{corruption}.npy'
-                            try:
-                                np_data_c = np.load(
-                                    f"{self.corrupt_c_path}/{corruption}.npy"
-                                )
-                            except FileNotFoundError as e:
-                                try:
-                                    np_data_c = np.load(
-                                        f"{self.corrupt_bar_path}/{corruption}.npy"
-                                    )
-                                except FileNotFoundError as e:
-                                    raise FileNotFoundError(
-                                        f"File '{corruption}.npy' not found in {self.corrupt_c_path} or {self.corrupt_bar_path}"
-                                    ) from e
+        self.trainset = AugmentedDataset(
+            original_subset,
+            stylized_original_subset,
+            generated_subset,
+            stylized_generated_subset,
+            style_mask_orig,
+            style_mask_gen,
+            self.transforms_preprocess,
+            self.transforms_basic,
+            self.transforms_orig_after_style,
+            self.transforms_gen_after_style,
+            self.transforms_orig_after_nostyle,
+            self.transforms_gen_after_nostyle,
+            self.robust_samples,
+        )
 
-                        else:
+    def load_data_c(self, subset, subsetsize, valid_run=False):
+        c_datasets = []
+        # c-corruption benchmark: https://github.com/hendrycks/robustness
+        current_dir = os.path.dirname(__file__)
+        c_path = os.path.join(current_dir, "../data/c-labels.txt")
+        corruptions_c = np.asarray(np.loadtxt(c_path, dtype=list))  # CHANGE for Kaggle
+
+        if self.dataset == "CIFAR10" or self.dataset == "CIFAR100":
+            # c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
+            c_bar_path = os.path.join(current_dir, "../data/c-bar-labels-cifar.txt")
+            corruptions_bar = np.asarray(
+                np.loadtxt(c_bar_path, dtype=list)
+            )  # CHANGE for Kaggle
+            corruptions = [(string, "c") for string in corruptions_c] + [
+                (string, "c-bar") for string in corruptions_bar
+            ]
+
+            for corruption, set in corruptions:
+                subtestset = self.testset
+                if self.kaggle:
+                    # np_data_c = np.concatenate(np.load(os.path.abspath(f'{self.corrupt_path}/{corruption}.npy')), np.load(os.path.abspath(f'{self.corrupt_path}-bar/{corruption}.npy')), axis=0)
+                    # corrupt_file_dir = f'{self.corrupt_path}/{corruption}.npy'
+                    try:
+                        np_data_c = np.load(f"{self.corrupt_c_path}/{corruption}.npy")
+                    except FileNotFoundError as e:
+                        try:
                             np_data_c = np.load(
-                                os.path.abspath(
-                                    f"../data/{self.dataset}-{set}/{corruption}.npy"
-                                )
+                                f"{self.corrupt_bar_path}/{corruption}.npy"
                             )
-                        np_data_c = np.array(np.array_split(np_data_c, 5))
+                        except FileNotFoundError as e:
+                            raise FileNotFoundError(
+                                f"File '{corruption}.npy' not found in {self.corrupt_c_path} or {self.corrupt_bar_path}"
+                            ) from e
 
-                        if subset == True:
-                            np.random.seed(0)
-                            selected_indices = np.random.choice(
-                                10000, subsetsize, replace=False
-                            )
-                            subtestset = Subset(self.testset, selected_indices)
-
-                            np_data_c = [
-                                intensity_dataset[selected_indices]
-                                for intensity_dataset in np_data_c
-                            ]
-
-                        concat_intensities = ConcatDataset(
-                            [
-                                CustomDataset(intensity_data_c, subtestset, self.resize)
-                                for intensity_data_c in np_data_c
-                            ]
+                else:
+                    np_data_c = np.load(
+                        os.path.abspath(
+                            f"../data/{self.dataset}-{set}/{corruption}.npy"
                         )
-                        c_datasets.append(concat_intensities)
-
-                elif self.dataset == "ImageNet" or self.dataset == "TinyImageNet":
-                    # c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
-                    # corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-IN.txt'), dtype=list))
-                    c_bar_path = os.path.join(
-                        current_dir, "../data/c-bar-labels-IN.txt"
                     )
-                    corruptions_bar = np.asarray(np.loadtxt(c_bar_path, dtype=list))
-                    corruptions = [(string, "c") for string in corruptions_c] + [
-                        (string, "c-bar") for string in corruptions_bar
+                np_data_c = np.array(np.array_split(np_data_c, 5))
+
+                if subset == True:
+                    np.random.seed(0)
+                    selected_indices = np.random.choice(
+                        10000, subsetsize, replace=False
+                    )
+                    subtestset = Subset(self.testset, selected_indices)
+
+                    np_data_c = [
+                        intensity_dataset[selected_indices]
+                        for intensity_dataset in np_data_c
                     ]
-                    for corruption, set in corruptions:
-                        # intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity)),
-                        #   transform=self.transforms_preprocess) for intensity in range(1, 6)]
-                        if self.kaggle:
-                            try:
-                                intensity_datasets = [
-                                    torchvision.datasets.ImageFolder(
-                                        root=os.path.join(
-                                            self.corrupt_c_path,
-                                            corruption,
-                                            str(intensity),
-                                        ),
-                                        transform=self.transforms_preprocess,
-                                    )
-                                    for intensity in range(1, 6)
-                                ]
-                            except FileNotFoundError as e:
-                                try:
-                                    intensity_datasets = [
-                                        torchvision.datasets.ImageFolder(
-                                            root=os.path.join(
-                                                self.corrupt_bar_path,
-                                                corruption,
-                                                str(intensity),
-                                            ),
-                                            transform=self.transforms_preprocess,
-                                        )
-                                        for intensity in range(1, 6)
-                                    ]
-                                except FileNotFoundError as e:
-                                    raise FileNotFoundError(
-                                        f"File '{corruption}.npy' not found in {self.corrupt_c_path} or {self.corrupt_bar_path}"
-                                    ) from e
-                        else:
+
+                concat_intensities = ConcatDataset(
+                    [
+                        CustomDataset(intensity_data_c, subtestset, self.resize)
+                        for intensity_data_c in np_data_c
+                    ]
+                )
+                c_datasets.append(concat_intensities)
+
+        elif self.dataset == "ImageNet" or self.dataset == "TinyImageNet":
+            # c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
+            # corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-IN.txt'), dtype=list))
+            c_bar_path = os.path.join(current_dir, "../data/c-bar-labels-IN.txt")
+            corruptions_bar = np.asarray(np.loadtxt(c_bar_path, dtype=list))
+            corruptions = [(string, "c") for string in corruptions_c] + [
+                (string, "c-bar") for string in corruptions_bar
+            ]
+            for corruption, set in corruptions:
+                # intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity)),
+                #   transform=self.transforms_preprocess) for intensity in range(1, 6)]
+                if self.kaggle:
+                    try:
+                        intensity_datasets = [
+                            torchvision.datasets.ImageFolder(
+                                root=os.path.join(
+                                    self.corrupt_c_path,
+                                    corruption,
+                                    str(intensity),
+                                ),
+                                transform=self.transforms_preprocess,
+                            )
+                            for intensity in range(1, 6)
+                        ]
+                    except FileNotFoundError as e:
+                        try:
                             intensity_datasets = [
                                 torchvision.datasets.ImageFolder(
-                                    root=os.path.abspath(
-                                        f"../data/{self.dataset}-{set}/"
-                                        + corruption
-                                        + "/"
-                                        + str(intensity)
+                                    root=os.path.join(
+                                        self.corrupt_bar_path,
+                                        corruption,
+                                        str(intensity),
                                     ),
                                     transform=self.transforms_preprocess,
                                 )
                                 for intensity in range(1, 6)
                             ]
-
-                        if subset == True:
-                            selected_indices = np.random.choice(
-                                len(intensity_datasets[0]), subsetsize, replace=False
-                            )
-                            intensity_datasets = [
-                                Subset(intensity_dataset, selected_indices)
-                                for intensity_dataset in intensity_datasets
-                            ]
-                        concat_intensities = ConcatDataset(intensity_datasets)
-                        c_datasets.append(concat_intensities)
+                        except FileNotFoundError as e:
+                            raise FileNotFoundError(
+                                f"File '{corruption}.npy' not found in {self.corrupt_c_path} or {self.corrupt_bar_path}"
+                            ) from e
                 else:
-                    print(
-                        "No corrupted benchmark available other than CIFAR10-c, CIFAR100-c, TinyImageNet-c and ImageNet-c."
-                    )
-                    return
+                    intensity_datasets = [
+                        torchvision.datasets.ImageFolder(
+                            root=os.path.abspath(
+                                f"../data/{self.dataset}-{set}/"
+                                + corruption
+                                + "/"
+                                + str(intensity)
+                            ),
+                            transform=self.transforms_preprocess,
+                        )
+                        for intensity in range(1, 6)
+                    ]
 
                 if subset == True:
-                    c_datasets = ConcatDataset(c_datasets)
-                    self.c_datasets_dict = {"combined": c_datasets}
-                else:
-                    self.c_datasets_dict = {
-                        label: dataset
-                        for label, dataset in zip(
-                            [corr for corr, _ in corruptions], c_datasets
-                        )
-                    }
+                    selected_indices = np.random.choice(
+                        len(intensity_datasets[0]), subsetsize, replace=False
+                    )
+                    intensity_datasets = [
+                        Subset(intensity_dataset, selected_indices)
+                        for intensity_dataset in intensity_datasets
+                    ]
+                concat_intensities = ConcatDataset(intensity_datasets)
+                c_datasets.append(concat_intensities)
+        else:
+            print(
+                "No corrupted benchmark available other than CIFAR10-c, CIFAR100-c, TinyImageNet-c and ImageNet-c."
+            )
+            return
 
-                return self.c_datasets_dict
+        if subset == True:
+            c_datasets = ConcatDataset(c_datasets)
+            self.c_datasets_dict = {"combined": c_datasets}
+        else:
+            self.c_datasets_dict = {
+                label: dataset
+                for label, dataset in zip([corr for corr, _ in corruptions], c_datasets)
+            }
+
+        return self.c_datasets_dict
 
     def get_loader(self, batchsize):
         self.batchsize = batchsize
