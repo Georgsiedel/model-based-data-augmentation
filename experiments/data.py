@@ -344,140 +344,132 @@ class DataLoading:
             self.robust_samples,
         )
 
-    def load_data_c(self, subset, subsetsize, valid_run=False):
+    def load_data_c(self, subset, subsetsize, valid_run):
         c_datasets = []
-        # c-corruption benchmark: https://github.com/hendrycks/robustness
         current_dir = os.path.dirname(__file__)
+
+        # Load corruption labels
         c_path = os.path.join(current_dir, "../data/c-labels.txt")
-        corruptions_c = np.asarray(np.loadtxt(c_path, dtype=list))  # CHANGE for Kaggle
+        corruptions_c = np.asarray(np.loadtxt(c_path, dtype=list))
 
-        if self.dataset == "CIFAR10" or self.dataset == "CIFAR100":
-            # c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
+        np.random.seed(self.run)
+        torch.manual_seed(self.run)
+        random.seed(self.run)
+        global fixed_worker_rng
+        fixed_worker_rng = np.random.default_rng()
+
+        if self.dataset in ["CIFAR10", "CIFAR100"]:
+            # Load c-bar corruptions
             c_bar_path = os.path.join(current_dir, "../data/c-bar-labels-cifar.txt")
-            corruptions_bar = np.asarray(
-                np.loadtxt(c_bar_path, dtype=list)
-            )  # CHANGE for Kaggle
-            corruptions = [(string, "c") for string in corruptions_c] + [
-                (string, "c-bar") for string in corruptions_bar
-            ]
-
-            for corruption, set in corruptions:
-                subtestset = self.testset
-                if self.kaggle:
-                    # np_data_c = np.concatenate(np.load(os.path.abspath(f'{self.corrupt_path}/{corruption}.npy')), np.load(os.path.abspath(f'{self.corrupt_path}-bar/{corruption}.npy')), axis=0)
-                    # corrupt_file_dir = f'{self.corrupt_path}/{corruption}.npy'
-                    try:
-                        np_data_c = np.load(f"{self.corrupt_c_path}/{corruption}.npy")
-                    except FileNotFoundError as e:
-                        try:
-                            np_data_c = np.load(
-                                f"{self.corrupt_bar_path}/{corruption}.npy"
-                            )
-                        except FileNotFoundError as e:
-                            raise FileNotFoundError(
-                                f"File '{corruption}.npy' not found in {self.corrupt_c_path} or {self.corrupt_bar_path}"
-                            ) from e
-
-                else:
-                    np_data_c = np.load(
-                        os.path.abspath(
-                            f"../data/{self.dataset}-{set}/{corruption}.npy"
-                        )
-                    )
-                np_data_c = np.array(np.array_split(np_data_c, 5))
-
-                if subset == True:
-                    np.random.seed(0)
-                    selected_indices = np.random.choice(
-                        10000, subsetsize, replace=False
-                    )
-                    subtestset = Subset(self.testset, selected_indices)
-
-                    np_data_c = [
-                        intensity_dataset[selected_indices]
-                        for intensity_dataset in np_data_c
-                    ]
-
-                concat_intensities = ConcatDataset(
-                    [
-                        CustomDataset(intensity_data_c, subtestset, self.resize)
-                        for intensity_data_c in np_data_c
-                    ]
-                )
-                c_datasets.append(concat_intensities)
-
-        elif self.dataset == "ImageNet" or self.dataset == "TinyImageNet":
-            # c-bar-corruption benchmark: https://github.com/facebookresearch/augmentation-corruption
-            # corruptions_bar = np.asarray(np.loadtxt(os.path.abspath('../data/c-bar-labels-IN.txt'), dtype=list))
-            c_bar_path = os.path.join(current_dir, "../data/c-bar-labels-IN.txt")
-            corruptions_bar = np.asarray(np.loadtxt(c_bar_path, dtype=list))
-            corruptions = [(string, "c") for string in corruptions_c] + [
-                (string, "c-bar") for string in corruptions_bar
-            ]
-            for corruption, set in corruptions:
-                # intensity_datasets = [torchvision.datasets.ImageFolder(root=os.path.abspath(f'../data/{self.dataset}-{set}/' + corruption + '/' + str(intensity)),
-                #   transform=self.transforms_preprocess) for intensity in range(1, 6)]
-                if self.kaggle:
-                    try:
-                        intensity_datasets = [
-                            torchvision.datasets.ImageFolder(
-                                root=os.path.join(
-                                    self.corrupt_c_path,
-                                    corruption,
-                                    str(intensity),
-                                ),
-                                transform=self.transforms_preprocess,
-                            )
-                            for intensity in range(1, 6)
-                        ]
-                    except FileNotFoundError as e:
-                        try:
-                            intensity_datasets = [
-                                torchvision.datasets.ImageFolder(
-                                    root=os.path.join(
-                                        self.corrupt_bar_path,
-                                        corruption,
-                                        str(intensity),
-                                    ),
-                                    transform=self.transforms_preprocess,
-                                )
-                                for intensity in range(1, 6)
-                            ]
-                        except FileNotFoundError as e:
-                            raise FileNotFoundError(
-                                f"File '{corruption}.npy' not found in {self.corrupt_c_path} or {self.corrupt_bar_path}"
-                            ) from e
-                else:
-                    intensity_datasets = [
-                        torchvision.datasets.ImageFolder(
-                            root=os.path.abspath(
-                                f"../data/{self.dataset}-{set}/"
-                                + corruption
-                                + "/"
-                                + str(intensity)
-                            ),
-                            transform=self.transforms_preprocess,
-                        )
-                        for intensity in range(1, 6)
-                    ]
-
-                if subset == True:
-                    selected_indices = np.random.choice(
-                        len(intensity_datasets[0]), subsetsize, replace=False
-                    )
-                    intensity_datasets = [
-                        Subset(intensity_dataset, selected_indices)
-                        for intensity_dataset in intensity_datasets
-                    ]
-                concat_intensities = ConcatDataset(intensity_datasets)
-                c_datasets.append(concat_intensities)
-        else:
-            print(
-                "No corrupted benchmark available other than CIFAR10-c, CIFAR100-c, TinyImageNet-c and ImageNet-c."
+            csv_handler = CsvHandler(
+                os.path.join(current_dir, "../data/cifar_c_bar.csv")
             )
+            corruptions_bar = csv_handler.read_corruptions()
+            corruptions = [(s, "c") for s in corruptions_c] + [
+                (s, "c-bar") for s in corruptions_bar
+            ]
+
+            for corruption, set_name in corruptions:
+                if self.validontest:
+                    subtestset = self.testset
+
+                    # Load .npy corruption file with Kaggle-aware paths
+                    try:
+                        if self.kaggle:
+                            try:
+                                np_data_c = np.load(
+                                    os.path.join(
+                                        self.corrupt_c_path, f"{corruption}.npy"
+                                    )
+                                )
+                            except FileNotFoundError:
+                                np_data_c = np.load(
+                                    os.path.join(
+                                        self.corrupt_bar_path, f"{corruption}.npy"
+                                    )
+                                )
+                        else:
+                            np_data_c = np.load(
+                                os.path.abspath(
+                                    f"../data/{self.dataset}-{set_name}/{corruption}.npy"
+                                )
+                            )
+                    except FileNotFoundError as e:
+                        raise FileNotFoundError(
+                            f"Missing corruption file: {corruption}"
+                        ) from e
+
+                    np_data_c = np.array(np.array_split(np_data_c, 5))
+
+                    if subset:
+                        selected_indices = np.random.choice(
+                            len(self.testset), subsetsize, replace=False
+                        )
+                        subtestset = Subset(self.testset, selected_indices)
+                        np_data_c = [
+                            intensity_dataset[selected_indices]
+                            for intensity_dataset in np_data_c
+                        ]
+
+                    concat_intensities = ConcatDataset(
+                        [
+                            CustomDataset(
+                                intensity_data_c,
+                                subtestset,
+                                self.resize,
+                                self.transforms_preprocess,
+                            )
+                            for intensity_data_c in np_data_c
+                        ]
+                    )
+                    c_datasets.append(concat_intensities)
+
+                else:
+                    # Random corruption applied on-the-fly
+                    corrupted_set = SubsetWithTransform(
+                        self.testset,
+                        transform=custom_transforms.RandomCommonCorruptionTransform(
+                            set_name, corruption, self.dataset, csv_handler
+                        ),
+                    )
+
+                    if subset:
+                        selected_indices = np.random.choice(
+                            len(self.testset), subsetsize, replace=False
+                        )
+                        corrupted_set = Subset(corrupted_set, selected_indices)
+
+                    if valid_run:
+                        # Cache transformed samples
+                        r = torch.Generator()
+                        r.manual_seed(0)
+                        precompute_loader = DataLoader(
+                            corrupted_set,
+                            batch_size=1,
+                            shuffle=False,
+                            pin_memory=True,
+                            num_workers=self.number_workers,
+                            worker_init_fn=seed_worker,
+                            generator=r,
+                        )
+
+                        if corruption in ["caustic_refraction", "sparkles"]:
+                            precomputed_samples = [
+                                (sample[0], label[0])
+                                for sample, label in precompute_loader
+                            ]
+                        else:
+                            precomputed_samples = [sample for sample in corrupted_set]
+
+                        corrupted_set = ListDataset(precomputed_samples)
+
+                    c_datasets.append(corrupted_set)
+
+        else:
+            print("No corrupted benchmark available other than CIFAR10-c, CIFAR100-c.")
             return
 
-        if subset == True:
+        if subset:
             c_datasets = ConcatDataset(c_datasets)
             self.c_datasets_dict = {"combined": c_datasets}
         else:
