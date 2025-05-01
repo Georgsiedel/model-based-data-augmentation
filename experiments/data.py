@@ -127,6 +127,7 @@ class DataLoading:
         self.epochs = epochs
         self.test_only = test_only
         self.factor = factor
+        self.validontest = validontest
         self.number_workers = number_workers
         self.kaggle = kaggle
 
