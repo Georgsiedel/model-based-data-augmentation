@@ -548,7 +548,7 @@ if __name__ == "__main__":
     Dataloader.create_transforms(
         args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability
     )
-    Dataloader.load_base_data(validontest=False)
+    Dataloader.load_base_data(validontest=args.validontest)
     testsets_c = (
         Dataloader.load_data_c(subset=True, subsetsize=100, valid_run=True)
         if args.validonc

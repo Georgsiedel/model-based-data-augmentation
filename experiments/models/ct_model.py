@@ -238,6 +238,7 @@ class CtModel(nn.Module):
 
         # Normalize content feature and apply style moments
         normalized_content = (content_feat - content_mean) / content_std
+        print("Internal AdaIN applied to content and style features")
         output = normalized_content * style_std + style_mean
 
         return output
