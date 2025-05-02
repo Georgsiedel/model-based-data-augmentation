@@ -385,8 +385,6 @@ def train_epoch(pbar):
             random_indices = torch.randperm(inputs.size(0))
             style_feats = inputs[random_indices]
 
-        else:
-            style_feats = None
         with torch.amp.autocast(device_type=device):
             outputs, mixed_targets = model(
                 inputs,
