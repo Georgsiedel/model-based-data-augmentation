@@ -214,7 +214,7 @@ if __name__ == "__main__":
         Dataloader.create_transforms(
             train_aug_strat_orig="None", train_aug_strat_gen="None"
         )
-        Dataloader.load_base_data(test_only=True)
+        Dataloader.load_base_data(validontest=args.validontest)
         workers = 0 if args.validontest else args.number_workers
 
         testloader = torch.utils.data.DataLoader(
