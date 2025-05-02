@@ -667,7 +667,6 @@ if __name__ == "__main__":
             style_dataloader = Dataloader.load_style_dataloader(
                 style_dir=style_dir, batch_size=args.batchsize
             )
-            print("Style dataloader loaded")
         else:
             style_dataloader = None
 

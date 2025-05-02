@@ -188,9 +188,6 @@ class CtModel(nn.Module):
 
             if style_norm_type == "int_adain":
                 if prob < int_adain_probability and i == 0:
-                    print(
-                        f"Applying int_adain. Shape of style_feats: {style_feats.shape}"
-                    )
                     # style_feats = self.blocks[0](style_feats)
                     style_feats = ResidualBlock(style_feats)
                     out = self.internal_adain(out, style_feats)
