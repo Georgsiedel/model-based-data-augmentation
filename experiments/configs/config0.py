@@ -76,7 +76,6 @@ int_adain_params = {
     "norm_type": "int_adain",  # int_adain, pono
     "style_probability": 0.5,
     "style_dir": "/kaggle/input/painter-by-numbers-resized",
-    "moex_mode": False,
 }
 n2n_deepaugment = False
 
