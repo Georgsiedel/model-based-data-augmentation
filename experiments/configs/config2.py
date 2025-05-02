@@ -81,7 +81,7 @@ int_adain_params = {
     "style_probability": 0.5,
     "style_dir": "/kaggle/input/painter-by-numbers-resized",
 }
-
+n2n_deepaugment = False
 # define train and test corruptions:
 # define noise type (first column): 'gaussian', 'uniform-l0-impulse', 'uniform-l0-salt-pepper', 'uniform-linf'. also: all positive numbers p>0 for uniform Lp possible: 'uniform-l1', 'uniform-l2', ...
 # define intensity (second column): max.-distance of random perturbations for model training and evaluation (gaussian: std-dev; l0: proportion of pixels corrupted; lp: epsilon)
