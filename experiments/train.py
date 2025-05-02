@@ -368,7 +368,6 @@ def train_epoch(pbar):
             try:
                 style_feats = next(style_iter)
                 style_feats = style_feats.to(device, dtype=torch.float32)
-                print("Style feats shape: ", style_feats.shape)
             except StopIteration:
                 style_iter = iter(style_dataloader)
                 style_feats = next(style_iter)

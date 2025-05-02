@@ -174,7 +174,7 @@ class CtModel(nn.Module):
         out = self.blocks[0](out)
 
         if style_feats is not None:
-            print("Style feats shape: ", style_feats.shape)
+            print("Style feats passed through the first conv layer")
             style_feats = self.blocks[0](style_feats)
 
         prob = torch.rand(1).item()
