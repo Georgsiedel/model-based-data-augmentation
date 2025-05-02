@@ -381,8 +381,8 @@ def train_epoch(pbar):
 
         if args.int_adain_params.get("moex_mode", False):
             print("Moment Exchange Applied")
-            random_indices = torch.randperm(input.size(0))
-            style_feats = input[random_indices]
+            random_indices = torch.randperm(inputs.size(0))
+            style_feats = inputs[random_indices]
 
         else:
             style_feats = None
