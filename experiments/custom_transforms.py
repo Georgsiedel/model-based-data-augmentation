@@ -151,7 +151,7 @@ class TransformFactory:
             return BatchStyleTransforms(stylized_ratio=0.4, batch_size=50, transform_style=self._stylization(0.95, 0.4, 0.7)), self.re, transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
         elif strat_name == "TAorStyle30alpha04-07":
             return BatchStyleTransforms(stylized_ratio=0.3, batch_size=50, transform_style=self._stylization(0.95, 0.4, 0.7)), self.re, transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
-        if strat_name == "TAorStyle10alpha04-07":
+        elif strat_name == "TAorStyle10alpha04-07":
             return BatchStyleTransforms(stylized_ratio=0.1, batch_size=50, transform_style=self._stylization(0.95, 0.4, 0.7)), self.re, transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
         elif strat_name == "TAorStyle90alpha05-08":
             return BatchStyleTransforms(stylized_ratio=0.9, batch_size=50, transform_style=self._stylization(0.95, 0.5, 0.8)), self.re, transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
@@ -181,7 +181,7 @@ class TransformFactory:
             return BatchStyleTransforms(stylized_ratio=0.4, batch_size=50, transform_style=self._stylization(0.95, 0.5, 0.8)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
         elif strat_name == "TAandStyle50alpha05-08":
             return BatchStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=self._stylization(0.95, 0.5, 0.8)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
-        if strat_name == "TAandStyle10alpha04-07":
+        elif strat_name == "TAandStyle10alpha04-07":
             return BatchStyleTransforms(stylized_ratio=0.1, batch_size=50, transform_style=self._stylization(0.95, 0.4, 0.7)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
         elif strat_name == "TAandStyle20alpha04-07":
             return BatchStyleTransforms(stylized_ratio=0.2, batch_size=50, transform_style=self._stylization(0.95, 0.4, 0.7)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
@@ -209,8 +209,18 @@ class TransformFactory:
             return BatchStyleTransforms(stylized_ratio=0.3, batch_size=50, transform_style=self._stylization(0.95, 1.0, 1.0)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
         elif strat_name == "TAandStyle40alpha10":
             return BatchStyleTransforms(stylized_ratio=0.4, batch_size=50, transform_style=self._stylization(0.95, 1.0, 1.0)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
-        if strat_name == "TAandStyle50alpha10":
+        elif strat_name == "TAandStyle50alpha10":
             return BatchStyleTransforms(stylized_ratio=0.5, batch_size=50, transform_style=self._stylization(0.95, 1.0, 1.0)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
+        elif strat_name == "AugMixandStyle20alpha10":
+            return BatchStyleTransforms(stylized_ratio=0.2, batch_size=50, transform_style=self._stylization(0.95, 1.0, 1.0)), transforms.Compose([transforms_v2.AugMix(), self.re]), transforms.Compose([transforms_v2.AugMix(), self.re])
+        elif strat_name == "AugMixandStyle30alpha10":
+            return BatchStyleTransforms(stylized_ratio=0.3, batch_size=50, transform_style=self._stylization(0.95, 1.0, 1.0)), transforms.Compose([transforms_v2.AugMix(), self.re]), transforms.Compose([transforms_v2.AugMix(), self.re])
+        elif strat_name == "AugMixandStyle40alpha1-10":
+            return BatchStyleTransforms(stylized_ratio=0.4, batch_size=50, transform_style=self._stylization(0.95, 0.1, 1.0)), transforms.Compose([transforms_v2.AugMix(), self.re]), transforms.Compose([transforms_v2.AugMix(), self.re])
+        elif strat_name == "AugMixorStyle20alpha1-10":
+            return BatchStyleTransforms(stylized_ratio=0.2, batch_size=50, transform_style=self._stylization(0.95, 0.1, 1.0)), self.re, transforms.Compose([transforms_v2.AugMix(), self.re])
+        elif strat_name == "AugMixorStyle40alpha1-10":
+            return BatchStyleTransforms(stylized_ratio=0.4, batch_size=50, transform_style=self._stylization(0.95, 0.1, 1.0)), self.re, transforms.Compose([transforms_v2.AugMix(), self.re])
         elif strat_name == "StyleorColorAndGeometricOrRE":
             random_choice = RandomChoiceTransforms([self.TAg, transforms_v2.RandomErasing(p=1.0, scale=(0.02, 0.4), value='random'), transforms_v2.RandomErasing(p=1.0, scale=(0.02, 0.4), value=0)], [0.7, 0.15, 0.15])
             combined_transform = transforms.Compose([self.TAc, random_choice])
@@ -412,6 +422,16 @@ class TransformFactory:
             return DatasetStyleTransforms(stylized_ratio=0.9, batch_size=50, transform_style=self._stylization(0.95, 1.0, 1.0)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
         elif strat_name == "TAandStyle100alpha10":
             return DatasetStyleTransforms(stylized_ratio=1.0, batch_size=50, transform_style=self._stylization(0.95, 1.0, 1.0)), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re]), transforms.Compose([transforms_v2.TrivialAugmentWide(), self.re])
+        elif strat_name == "AugMixandStyle20alpha10":
+            return DatasetStyleTransforms(stylized_ratio=0.2, batch_size=50, transform_style=self._stylization(0.95, 1.0, 1.0)), transforms.Compose([transforms_v2.AugMix(), self.re]), transforms.Compose([transforms_v2.AugMix(), self.re])
+        elif strat_name == "AugMixandStyle30alpha10":
+            return DatasetStyleTransforms(stylized_ratio=0.3, batch_size=50, transform_style=self._stylization(0.95, 1.0, 1.0)), transforms.Compose([transforms_v2.AugMix(), self.re]), transforms.Compose([transforms_v2.AugMix(), self.re])
+        elif strat_name == "AugMixandStyle40alpha01-10":
+            return DatasetStyleTransforms(stylized_ratio=0.4, batch_size=50, transform_style=self._stylization(0.95, 0.1, 1.0)), transforms.Compose([transforms_v2.AugMix(), self.re]), transforms.Compose([transforms_v2.AugMix(), self.re])
+        elif strat_name == "AugMixorStyle20alpha01-10":
+            return DatasetStyleTransforms(stylized_ratio=0.2, batch_size=50, transform_style=self._stylization(0.95, 0.1, 1.0)), self.re, transforms.Compose([transforms_v2.AugMix(), self.re])
+        elif strat_name == "AugMixorStyle40alpha01-10":
+            return DatasetStyleTransforms(stylized_ratio=0.4, batch_size=50, transform_style=self._stylization(0.95, 0.1, 1.0)), self.re, transforms.Compose([transforms_v2.AugMix(), self.re])
         elif strat_name == "StyleorColorAndGeometricOrRE":
             random_choice = RandomChoiceTransforms([self.TAg, transforms_v2.RandomErasing(p=1.0, scale=(0.02, 0.4), value='random'), transforms_v2.RandomErasing(p=1.0, scale=(0.02, 0.4), value=0)], [0.7, 0.15, 0.15])
             combined_transform = transforms.Compose([self.TAc, random_choice])

@@ -6,24 +6,23 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 if __name__ == '__main__':
     import importlib
     
-    for experiment in [467,468,469,470]:
+    for experiment in [478,479,486,490,492,494,501,502,503,518,519,526,527,528,529,440,531,532,533,536]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
 
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
 
-        runs = 3
-        run_iter = [0,1,2]
+        runs = 1
+        run_iter =[0]
 
         if experiment in []:
             runs = 3
-            run_iter =[1,2]
-  
+            run_iter =[2]
 
         for run in run_iter:
             
-            resume = True if experiment in [467] and run in [0] else False
+            resume = True if experiment in [478] and run in [0] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
