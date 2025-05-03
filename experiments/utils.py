@@ -8,6 +8,8 @@ import ast
 import os
 import datetime
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -639,9 +641,10 @@ class TestTracking:
         self.calculate_autoattack_robustness = calculate_autoattack_robustness
         self.test_corruptions = test_corruptions
         self.adv_distance_params = adv_distance_params
-        self.report_path = os.path.abspath(
-            f"./results/{self.dataset}/{self.modeltype}/config{self.experiment}_result_metrics.csv"
-        )
+        self.report_path = os.path.join(
+        BASE_DIR,
+        f"results/{self.dataset}/{self.modeltype}/config{self.experiment}_result_metrics.csv"
+    )
         os.makedirs(os.path.dirname(self.report_path), exist_ok=True)
 
         self.eval_count = 1
@@ -688,32 +691,18 @@ class TestTracking:
                 )
 
         test_metrics_string = np.array(["Standard_Acc", "RMSCE"])
-        if self.test_on_c == True:
-            test_corruptions_label = np.loadtxt(
-                os.path.abspath("../data/c-labels.txt"), dtype=list
-            )
-            file_dir = os.path.dirname(__file__)
-            data_dir = os.path.join(file_dir, "../data")
-            corruption_file = os.path.join(data_dir, "c-labels.txt")
+        if self.test_on_c:
+            corruption_file = os.path.join(BASE_DIR, "../data/c-labels.txt")
             test_corruptions_label = np.loadtxt(corruption_file, dtype=list)
-            if self.dataset == "CIFAR10" or self.dataset == "CIFAR100":
-                test_corruptions_bar_label = np.loadtxt(
-                    os.path.abspath("../data/c-bar-labels-cifar.txt"), dtype=list
-                )
-                corruption_bar_file = os.path.join(data_dir, "c-bar-labels-cifar.txt")
-                test_corruptions_bar_label = np.loadtxt(corruption_bar_file, dtype=list)
-            elif self.dataset == "ImageNet" or self.dataset == "TinyImageNet":
-                test_corruptions_bar_label = np.loadtxt(
-                    os.path.abspath("../data/c-bar-labels-IN.txt"), dtype=list
-                )
-                corruption_bar_file = os.path.join(data_dir, "c-bar-labels-IN.txt")
-                test_corruptions_bar_label = np.loadtxt(corruption_bar_file, dtype=list)
-            test_metrics_string = np.append(
-                test_metrics_string, test_corruptions_label, axis=0
-            )
-            test_metrics_string = np.append(
-                test_metrics_string, test_corruptions_bar_label, axis=0
-            )
+
+            if self.dataset in ["CIFAR10", "CIFAR100"]:
+                corruption_bar_file = os.path.join(BASE_DIR, "../data/c-bar-labels-cifar.txt")
+            elif self.dataset in ["ImageNet", "TinyImageNet"]:
+                corruption_bar_file = os.path.join(BASE_DIR, "../data/c-bar-labels-IN.txt")
+            test_corruptions_bar_label = np.loadtxt(corruption_bar_file, dtype=list)
+
+            test_metrics_string = np.append(test_metrics_string, test_corruptions_label, axis=0)
+            test_metrics_string = np.append(test_metrics_string, test_corruptions_bar_label, axis=0)
             test_metrics_string = np.append(
                 test_metrics_string,
                 [
@@ -726,11 +715,11 @@ class TestTracking:
                 axis=0,
             )
 
-        if self.calculate_adv_distance == True:
+        if self.calculate_adv_distance:
             test_metrics_string = np.append(
                 test_metrics_string, ["Acc_from_adv_dist_calculation"]
             )
-            for _, n in enumerate(self.adv_distance_params["norm"]):
+            for n in self.adv_distance_params["norm"]:
                 test_metrics_string = np.append(
                     test_metrics_string,
                     [
@@ -739,33 +728,34 @@ class TestTracking:
                     ],
                     axis=0,
                 )
-                for _, b in enumerate(self.adv_distance_params["clever_samples"]):
+                for b in self.adv_distance_params["clever_samples"]:
                     test_metrics_string = np.append(
                         test_metrics_string,
                         [f"{n}-norm-Mean_CLEVER-{b}-samples"],
                         axis=0,
                     )
-        if self.calculate_autoattack_robustness == True:
+
+        if self.calculate_autoattack_robustness:
             test_metrics_string = np.append(
                 test_metrics_string,
                 ["Adversarial_accuracy_autoattack", "Mean_adv_distance_autoattack)"],
                 axis=0,
             )
-        if self.combine_test_corruptions == True:
+
+        if self.combine_test_corruptions:
             test_metrics_string = np.append(test_metrics_string, ["Combined_Noise"])
         else:
             test_corruptions_labels = np.array(
                 [",".join(map(str, row.values())) for row in self.test_corruptions]
             )
-            test_metrics_string = np.append(
-                test_metrics_string, test_corruptions_labels
-            )
+            test_metrics_string = np.append(test_metrics_string, test_corruptions_labels)
 
         report_frame = pd.DataFrame(
             self.test_metrics, index=test_metrics_string, columns=column_string
         )
+        report_path = os.path.join(BASE_DIR, self.report_path)
         report_frame.to_csv(
-            self.report_path,
+            report_path,
             index=True,
             header=True,
             sep=";",
@@ -777,9 +767,9 @@ class TestTracking:
         self.run = run
         self.accs = []
         print(f"Evaluating training run {run}")
-        self.filename = os.path.abspath(
-            f"../trained_models/{self.dataset}/{self.modeltype}/config{self.experiment}"
-            f"_run_{run}.pth"
+        self.filename = os.path.join(
+            BASE_DIR,
+            f"../trained_models/{self.dataset}/{self.modeltype}/config{self.experiment}_run_{run}.pth"
         )
 
     def track_results(self, new_results):
@@ -788,27 +778,23 @@ class TestTracking:
         self.all_test_metrics[: len(self.accs), self.run] = np.array(self.accs)
 
     def save_adv_distance(self, dist_sorted, adv_distance_params):
-        self.adv_report_path = os.path.abspath(
-            f"./results/{self.dataset}/{self.modeltype}/config{self.experiment}_"
-            f"run_{self.run}_adversarial_distances.csv"
+        self.adv_report_path = os.path.join(
+            BASE_DIR,
+            f"results/{self.dataset}/{self.modeltype}/config{self.experiment}_run_{self.run}_adversarial_distances.csv"
         )
         os.makedirs(os.path.dirname(self.adv_report_path), exist_ok=True)
 
-        if adv_distance_params["clever"] == False:
-            (
-                adv_distance_params["clever_batches"],
-                adv_distance_params["clever_samples"],
-            ) = [0.0], [0.0]
+        if not adv_distance_params["clever"]:
+            adv_distance_params["clever_batches"], adv_distance_params["clever_samples"] = [0.0], [0.0]
+
         columns = []
         for x in adv_distance_params["norm"]:
             columns.append(f"{x}-norm-min-adv-dist")
             columns.extend([f"{x}-norm-PGD-dist", f"{x}-norm-sec-att-dist"])
-            columns.extend(
-                [
-                    f"{x}-norm-Clever-{y}-samples"
-                    for y in adv_distance_params["clever_samples"]
-                ]
-            )
+            columns.extend([
+                f"{x}-norm-Clever-{y}-samples"
+                for y in adv_distance_params["clever_samples"]
+            ])
 
         adv_distance_frame = pd.DataFrame(
             index=range(adv_distance_params["setsize"]), columns=columns
@@ -816,96 +802,37 @@ class TestTracking:
         col_counter = 0
 
         for id, n in enumerate(adv_distance_params["norm"]):
-            adv_distance_frame.iloc[:, col_counter : col_counter + 3] = dist_sorted[
-                :, id * 3 : (id + 1) * 3
-            ]
+            adv_distance_frame.iloc[:, col_counter:col_counter+3] = dist_sorted[:, id*3:(id+1)*3]
             col_counter += 3
 
-            for j, (batches, samples) in enumerate(
-                zip(
-                    adv_distance_params["clever_batches"],
-                    adv_distance_params["clever_samples"],
-                )
-            ):
-                indices1 = np.where(
-                    (dist_sorted[:, id * 3 + 1] <= dist_sorted[:, id * 3 + 2])
-                    & (dist_sorted[:, id * 3 + 1] != 0)
-                )[0]
-                indices2 = np.where(
-                    (dist_sorted[:, id * 3 + 2] < dist_sorted[:, id * 3 + 1])
-                    & (dist_sorted[:, id * 3 + 2] != 0)
-                )[0]
-                # Find indices where column id*3+1 is 0 and column id*3+2 is not 0
-                indices_zero1 = np.where(
-                    (dist_sorted[:, id * 3 + 1] == 0)
-                    & (dist_sorted[:, id * 3 + 2] != 0)
-                )[0]
-                # Find indices where column id*3+2 is 0 and column id*3+1 is not 0
-                indices_zero2 = np.where(
-                    (dist_sorted[:, id * 3 + 2] == 0)
-                    & (dist_sorted[:, id * 3 + 1] != 0)
-                )[0]
-                # Find indices where both are 0 and asign them to PGD attack
-                indices_doublezero = np.where(
-                    (dist_sorted[:, id * 3 + 2] == 0)
-                    & (dist_sorted[:, id * 3 + 1] == 0)
-                )[0]
-                # Concatenate the indices with appropriate conditions
+            for j, (batches, samples) in enumerate(zip(adv_distance_params["clever_batches"], adv_distance_params["clever_samples"])):
+                indices1 = np.where((dist_sorted[:, id * 3 + 1] <= dist_sorted[:, id * 3 + 2]) & (dist_sorted[:, id * 3 + 1] != 0))[0]
+                indices2 = np.where((dist_sorted[:, id * 3 + 2] < dist_sorted[:, id * 3 + 1]) & (dist_sorted[:, id * 3 + 2] != 0))[0]
+                indices_zero1 = np.where((dist_sorted[:, id * 3 + 1] == 0) & (dist_sorted[:, id * 3 + 2] != 0))[0]
+                indices_zero2 = np.where((dist_sorted[:, id * 3 + 2] == 0) & (dist_sorted[:, id * 3 + 1] != 0))[0]
+                indices_doublezero = np.where((dist_sorted[:, id * 3 + 2] == 0) & (dist_sorted[:, id * 3 + 1] == 0))[0]
                 indices1 = np.concatenate((indices1, indices_zero2, indices_doublezero))
                 indices2 = np.concatenate((indices2, indices_zero1))
 
                 adv_fig = plt.figure(figsize=(15, 5))
-                plt.scatter(
-                    indices1,
-                    dist_sorted[:, id * 3 + 1][indices1],
-                    s=5,
-                    label="PGD Adversarial Distance",
-                )
-                plt.scatter(
-                    indices2,
-                    dist_sorted[:, id * 3 + 2][indices2],
-                    s=5,
-                    label="Second Attack Adversarial Distance",
-                )
+                plt.scatter(indices1, dist_sorted[:, id * 3 + 1][indices1], s=5, label="PGD Adversarial Distance")
+                plt.scatter(indices2, dist_sorted[:, id * 3 + 2][indices2], s=5, label="Second Attack Adversarial Distance")
                 if adv_distance_params["clever"]:
-                    plt.scatter(
-                        range(
-                            len(
-                                dist_sorted[
-                                    :,
-                                    len(adv_distance_params["norm"]) * 3
-                                    + id * len(adv_distance_params["clever_batches"])
-                                    + j,
-                                ]
-                            )
-                        ),
-                        dist_sorted[
-                            :,
-                            len(adv_distance_params["norm"]) * 3
-                            + id * len(adv_distance_params["clever_batches"])
-                            + j,
-                        ],
-                        s=5,
-                        label=f"Clever Score: {samples} samples",
-                    )
+                    clever_col_index = len(adv_distance_params["norm"]) * 3 + id * len(adv_distance_params["clever_batches"]) + j
+                    plt.scatter(range(len(dist_sorted[:, clever_col_index])), dist_sorted[:, clever_col_index], s=5, label=f"Clever Score: {samples} samples")
                 plt.title(f"{n}-norm adversarial distance vs. CLEVER score")
                 plt.xlabel("Image ID sorted by adversarial distance")
                 plt.ylabel("Distance")
                 plt.legend()
                 plt.close()
 
-                adv_fig.savefig(
-                    os.path.abspath(
-                        f"results/{self.dataset}/{self.modeltype}/config{self.experiment}_run"
-                        f"_{self.run}_adversarial_distances_{n}-norm_{samples}-CLEVER-samples.svg"
-                    )
+                fig_path = os.path.join(
+                    BASE_DIR,
+                    f"results/{self.dataset}/{self.modeltype}/config{self.experiment}_run_{self.run}_adversarial_distances_{n}-norm_{samples}-CLEVER-samples.svg"
                 )
-                adv_distance_frame.iloc[:, col_counter] = dist_sorted[
-                    :,
-                    len(adv_distance_params["norm"]) * 3
-                    + id * len(adv_distance_params["clever_batches"])
-                    + j,
-                ]
+                adv_fig.savefig(fig_path)
+
+                adv_distance_frame.iloc[:, col_counter] = dist_sorted[:, clever_col_index]
                 col_counter += 1
 
         adv_distance_frame.to_csv(
