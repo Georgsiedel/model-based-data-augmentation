@@ -1,12 +1,12 @@
 import numpy as np
 
 train_corruptions = np.array([
-#{'noise_type': 'standard', 'epsilon': 0.0, 'sphere': False, 'distribution': 'beta2-5'},
-{'noise_type': 'uniform-linf', 'epsilon': 0.2, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l0.5', 'epsilon': 12000000.0, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l1', 'epsilon': 1500.0, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l2', 'epsilon': 20.0, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l0-impulse', 'epsilon': 0.4, 'sphere': False, 'distribution': 'uniform'},
+{'noise_type': 'standard', 'epsilon': 0.0, 'sphere': False, 'distribution': 'beta2-5'},
+#{'noise_type': 'uniform-linf', 'epsilon': 0.2, 'sphere': False, 'distribution': 'uniform'},
+#{'noise_type': 'uniform-l0.5', 'epsilon': 12000000.0, 'sphere': False, 'distribution': 'uniform'},
+#{'noise_type': 'uniform-l1', 'epsilon': 1500.0, 'sphere': False, 'distribution': 'uniform'},
+#{'noise_type': 'uniform-l2', 'epsilon': 20.0, 'sphere': False, 'distribution': 'uniform'},
+#{'noise_type': 'uniform-l0-impulse', 'epsilon': 0.4, 'sphere': False, 'distribution': 'uniform'},
 ])
 noise_sparsity = 1.0
 noise_patch_scale = {'lower': 0.2, 'upper': 0.7}
@@ -42,11 +42,11 @@ trades_loss = False
 trades_lossparams = {'step_size': 0.003, 'epsilon': 0.031, 'perturb_steps': 10, 'beta': 5.0, 'distance': 'l_inf'}
 robust_loss = False
 robust_lossparams = {'num_splits': 3, 'alpha': 12} #jsd if 3 splits, KL divergence if 2 splits
-mixup = {'alpha': 1.0, 'p': 1.0} #default alpha 0.2 #If both mixup and cutmix are >0, mixup or cutmix are selected by 0.5 chance
+mixup = {'alpha': 1.0, 'p': 0.0} #default alpha 0.2 #If both mixup and cutmix are >0, mixup or cutmix are selected by 0.5 chance
 cutmix = {'alpha': 1.0, 'p': 0.0} # default alpha 1.0 #If both mixup and cutmix are >0, mixup or cutmix are selected by 0.5 chance
 manifold = {'apply': True, 'noise_factor': 3}
 n2n_deepaugment = False
-RandomEraseProbability = 0.3
+RandomEraseProbability = 0.0
 swa = {'apply': True, 'start_factor': 0.9, 'lr_factor': 0.2}
 
 #define train and test corruptions:

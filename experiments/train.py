@@ -19,6 +19,7 @@ import time
 import random
 
 import data
+import custom_datasets
 import utils
 import losses
 import models
@@ -357,7 +358,7 @@ if __name__ == '__main__':
     if args.swa['apply'] == True:
         print('Saving final SWA model')
         if criterion.robust_samples >= 1:
-            SWA_Loader = data.SwaLoader(trainloader, args.batchsize, criterion.robust_samples)
+            SWA_Loader = custom_datasets.SwaLoader(trainloader, args.batchsize, criterion.robust_samples)
             trainloader = SWA_Loader.get_swa_dataloader()
         torch.optim.swa_utils.update_bn(trainloader, swa_model, device)
         model = swa_model

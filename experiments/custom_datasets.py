@@ -429,9 +429,9 @@ class AugmentedDataset(torch.utils.data.Dataset):
                 x0 = self.stylized_generated_dataset.getclean(idx - self.num_original)
 
             if self.robust_samples == 1:
-                return (x0, augment(x)), int(y)
+                return (self.transforms_basic(x0), augment(x)), int(y)
             elif self.robust_samples == 2:
-                return (x0, augment(x), augment(x)), int(y)
+                return (self.transforms_basic(x0), augment(x), augment(x)), int(y)
 
     def __len__(self):
         return self.total_size

@@ -6,7 +6,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [485,400,488,489,487,493,500,517,524,538,541]:
+    for experiment in [524,532,538,541]: #517,489
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
         for run in run_iter:
 
-            resume = True if experiment in [485] and run in [0] else False
+            resume = True if experiment in [524] and run in [0] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
@@ -43,7 +43,10 @@ if __name__ == '__main__':
                     f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
                     f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} --n2n_deepaugment={config.n2n_deepaugment}"
-            os.system(cmd0)
+            if experiment in [39]:
+                print('skip')
+            else:
+                os.system(cmd0)
             
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
