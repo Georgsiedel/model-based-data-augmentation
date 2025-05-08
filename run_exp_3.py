@@ -7,7 +7,7 @@ torch.cuda.device_count()
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [521,535,541]: #525,504,520
+    for experiment in [525,526,527,522]: #525,504,520
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
         for run in run_iter:
 
-            resume = True if experiment in [521] and run in [0] else False
+            resume = True if experiment in [525] and run in [0] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
@@ -40,7 +40,7 @@ if __name__ == '__main__':
                     f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
                     f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} --n2n_deepaugment={config.n2n_deepaugment}"
-            if experiment in [51,28,58,88]:
+            if experiment in [534]:
                 print('skip')
             else:
                 os.system(cmd0)
