@@ -4,7 +4,7 @@ experiments/models/__pycache__/
 experiments/configs/__pycache__/
 .idea/
 organizational/
-.venv/
+venv/
 experiments/adaIN/__pycache__/
 __pycache__/
 visualization/
