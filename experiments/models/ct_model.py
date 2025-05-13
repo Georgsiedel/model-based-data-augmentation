@@ -113,7 +113,7 @@ class CtModel(nn.Module):
                                                             noise_patch_lower_scale=noise_patch_lower_scale,
                                                             noise_patch_upper_scale=noise_patch_upper_scale)
             out = noisy_out
-            # plot_images(4, self.mean, self.std, noisy_out, noisy_out)
+            plot_images(2, self.mean, self.std, noisy_out, noisy_out)
 
         out = self.blocks[0](out)
 

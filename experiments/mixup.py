@@ -5,6 +5,7 @@ import math
 from torch import Tensor
 from typing import List, Optional, Tuple
 import random
+from run_exp import device
 
 class RandomMixup(torch.nn.Module):
     """Randomly apply Mixup to the provided batch and targets.
@@ -69,8 +70,8 @@ class RandomMixup(torch.nn.Module):
         q = int(batch.shape[0] / (robust_samples+1))
         gen = int(q * self.generated_ratio)
         orig = q - gen
-        index_gen = torch.randperm(gen).cuda()
-        index_orig = torch.randperm(orig).cuda()
+        index_gen = torch.randperm(gen).to(device)
+        index_orig = torch.randperm(orig).to(device)
         for i in range(robust_samples+1):
             batch[q*i:q*i+orig] = lambda_param * batch[q*i:q*i+orig] + (1 - lambda_param) * batch[q*i:q*i+orig][index_orig]
             batch[q*i+orig:q*(i+1)] = lambda_param * batch[q*i+orig:q*(i+1)] + (1 - lambda_param) * batch[q*i+orig:q*(i+1)][index_gen]
@@ -168,8 +169,8 @@ class RandomCutmix(torch.nn.Module):
         q = int(batch.shape[0] / (robust_samples+1))
         gen = int(q * self.generated_ratio)
         orig = q - gen
-        index_gen = torch.randperm(gen).cuda()
-        index_orig = torch.randperm(orig).cuda()
+        index_gen = torch.randperm(gen).to(device)
+        index_orig = torch.randperm(orig).to(device)
         for i in range(robust_samples+1):
             batch[q*i:q*i+orig, :, y1:y2, x1:x2] = batch[q*i:q*i+orig, :, y1:y2, x1:x2][index_orig]
             batch[q*i+orig:q*(i+1), :, y1:y2, x1:x2] = batch[q*i+orig:q*(i+1), :, y1:y2, x1:x2][index_gen]
