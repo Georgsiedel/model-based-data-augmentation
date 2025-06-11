@@ -106,14 +106,14 @@ class CtModel(nn.Module):
                                                                 ratio=0.5)
                 out = self.deepaugment_instance(out)
             mixed_out, targets = mixup_process(out, targets, robust_samples, self.num_classes, mixup_alpha, mixup_p,
-                                         cutmix_alpha, cutmix_p, generated_ratio, manifold=False, inplace=True)
+                                         cutmix_alpha, cutmix_p, generated_ratio, manifold=False, inplace=False)
             noisy_out = apply_noise(mixed_out, noise_minibatchsize, corruptions, concurrent_combinations,
                                                             self.normalized, self.dataset,
                                                             manifold=False, manifold_factor=1, noise_sparsity=noise_sparsity,
                                                             noise_patch_lower_scale=noise_patch_lower_scale,
                                                             noise_patch_upper_scale=noise_patch_upper_scale)
             out = noisy_out
-            plot_images(2, self.mean, self.std, noisy_out, noisy_out)
+            #plot_images(2, self.mean, self.std, noisy_out, noisy_out)
 
         out = self.blocks[0](out)
 
