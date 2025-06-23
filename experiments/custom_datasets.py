@@ -300,6 +300,7 @@ class GroupedAugmentedDataset(torch.utils.data.Dataset):
 
         if transform_batch == None:
             x, y = dataset[dataset_specific_index]
+            style_flag = False
             
         else:
             # If the requested global index is cached, retrieve it.

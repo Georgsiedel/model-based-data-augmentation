@@ -12,6 +12,8 @@ if __name__ == '__main__':
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
 
+        grouped_stylization = True
+
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
  
         runs = 3
@@ -39,7 +41,8 @@ if __name__ == '__main__':
                     f" --normalize={config.normalize} --minibatchsize=" \
                     f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
-                    f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} --n2n_deepaugment={config.n2n_deepaugment}"
+                    f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} " \
+                    f"--n2n_deepaugment={config.n2n_deepaugment} --grouped_stylization={grouped_stylization}"
             if experiment in [513]:
                 print('skip')
             else:
