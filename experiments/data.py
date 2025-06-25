@@ -68,7 +68,7 @@ class DataLoading():
         elif dataset == 'TinyImageNet':
             self.factor = 2
 
-    def create_transforms(self, train_aug_strat_orig, train_aug_strat_gen, RandomEraseProbability=0.0):
+    def create_transforms(self, train_aug_strat_orig, train_aug_strat_gen, RandomEraseProbability=0.0, grouped_stylization=False):
         # list of all data transformations used
         t = transforms.ToTensor()
         c32 = transforms.RandomCrop(32, padding=4)
@@ -100,8 +100,8 @@ class DataLoading():
         elif self.dataset == 'TinyImageNet':
             self.transforms_basic = transforms.Compose([flip, c64])
 
-        self.stylization_orig, self.transforms_orig_after_style, self.transforms_orig_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_orig, re, self.dataset, self.factor)
-        self.stylization_gen, self.transforms_gen_after_style, self.transforms_gen_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_gen, re, self.dataset, self.factor)
+        self.stylization_orig, self.transforms_orig_after_style, self.transforms_orig_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_orig, re, self.dataset, self.factor, grouped_stylization)
+        self.stylization_gen, self.transforms_gen_after_style, self.transforms_gen_after_nostyle = custom_transforms.get_transforms_map(train_aug_strat_gen, re, self.dataset, self.factor, grouped_stylization)
 
     def load_base_data(self, test_only=False):
 
@@ -159,7 +159,7 @@ class DataLoading():
 
         
 
-    def load_augmented_traindata(self, target_size, epoch=0, robust_samples=0):
+    def load_augmented_traindata(self, target_size, epoch=0, robust_samples=0, grouped_stylization=False):
         self.robust_samples = robust_samples
         self.target_size = target_size
         self.generated_dataset = np.load(os.path.abspath(f'../data/{self.dataset}-add-1m-dm.npz'),
@@ -174,38 +174,63 @@ class DataLoading():
         self.num_generated = int(target_size * self.generated_ratio)
         self.num_original = target_size - self.num_generated
 
-        if self.num_original > 0:
-            original_indices = torch.randperm(self.target_size)[:self.num_original]
-            original_subset = SubsetWithTransform(Subset(self.base_trainset, original_indices), self.transforms_preprocess)
+        if grouped_stylization == False:
 
-            if self.stylization_orig is not None:
-                stylized_original_subset, style_mask_orig = self.stylization_orig(original_subset)
-            else: 
-                stylized_original_subset, style_mask_orig = original_subset, [False] * len(original_subset)
-        else:
-            stylized_original_subset, style_mask_orig = None, []
-        
-        if self.num_generated > 0 and self.generated_dataset is not None:
-            generated_indices = np.random.choice(len(self.generated_dataset['label']), size=self.num_generated, replace=False)
+            if self.num_original > 0:
+                original_indices = torch.randperm(self.target_size)[:self.num_original]
+                original_subset = SubsetWithTransform(Subset(self.base_trainset, original_indices), self.transforms_preprocess)
 
-            generated_subset = GeneratedDataset(
-                self.generated_dataset['image'][generated_indices],
-                self.generated_dataset['label'][generated_indices],
-                transform=self.transforms_preprocess
-            )
-
-            if self.stylization_gen is not None:
-                stylized_generated_subset, style_mask_gen = self.stylization_gen(generated_subset)
+                if self.stylization_orig is not None:
+                    stylized_original_subset, style_mask_orig = self.stylization_orig(original_subset)
+                else: 
+                    stylized_original_subset, style_mask_orig = original_subset, [False] * len(original_subset)
             else:
-                stylized_generated_subset, style_mask_gen = generated_subset, [False] * len(generated_subset)
+                stylized_original_subset, style_mask_orig = None, []
+            
+            if self.num_generated > 0 and self.generated_dataset is not None:
+                generated_indices = np.random.choice(len(self.generated_dataset['label']), size=self.num_generated, replace=False)
+
+                generated_subset = GeneratedDataset(
+                    self.generated_dataset['image'][generated_indices],
+                    self.generated_dataset['label'][generated_indices],
+                    transform=self.transforms_preprocess
+                )
+
+                if self.stylization_gen is not None:
+                    stylized_generated_subset, style_mask_gen = self.stylization_gen(generated_subset)
+                else:
+                    stylized_generated_subset, style_mask_gen = generated_subset, [False] * len(generated_subset)
+            else:
+                stylized_generated_subset, style_mask_gen = None, []
+            
+            style_mask = style_mask_orig + style_mask_gen
+            
+            self.trainset = AugmentedDataset(stylized_original_subset, stylized_generated_subset, style_mask,
+                                            self.transforms_basic, self.transforms_orig_after_style, self.transforms_gen_after_style, 
+                                            self.transforms_orig_after_nostyle, self.transforms_gen_after_nostyle, self.robust_samples)
+
         else:
-            stylized_generated_subset, style_mask_gen = None, []
-        
-        style_mask = style_mask_orig + style_mask_gen
-        
-        self.trainset = AugmentedDataset(stylized_original_subset, stylized_generated_subset, style_mask,
-                                         self.transforms_basic, self.transforms_orig_after_style, self.transforms_gen_after_style, 
-                                        self.transforms_orig_after_nostyle, self.transforms_gen_after_nostyle, self.robust_samples)
+
+            if self.num_original > 0:
+                original_indices = torch.randperm(len(self.base_trainset))[:self.num_original]
+                original_subset = SubsetWithTransform(Subset(self.base_trainset, original_indices), self.transforms_preprocess)
+            else:
+                original_subset = None
+            
+            if self.num_generated > 0 and self.generated_dataset is not None:
+                generated_indices = np.random.choice(len(self.generated_dataset['label']), size=self.num_generated, replace=False)
+
+                generated_subset = GeneratedDataset(
+                    self.generated_dataset['image'][generated_indices],
+                    self.generated_dataset['label'][generated_indices],
+                    transform=self.transforms_preprocess
+                )
+            else:
+                generated_subset = None
+            
+            self.trainset = GroupedAugmentedDataset(original_subset, generated_subset, self.transforms_basic, self.stylization_orig, 
+                                    self.stylization_gen, self.transforms_orig_after_style, self.transforms_gen_after_style, 
+                                    self.transforms_orig_after_nostyle, self.transforms_gen_after_nostyle, self.robust_samples, epoch)
 
 
     def load_data_c(self, subset, subsetsize, valid_run):
@@ -345,20 +370,29 @@ class DataLoading():
 
         return self.c_datasets_dict
 
-    def get_loader(self, batchsize):
+    def get_loader(self, batchsize, grouped_stylization=False):
 
         self.batchsize = batchsize
 
         g = torch.Generator()
         g.manual_seed(self.epoch + self.epochs * self.run)
 
-        if self.generated_ratio > 0.0:
-            self.CustomSampler = BalancedRatioSampler(self.trainset, generated_ratio=self.generated_ratio,
-                                                 batch_size=batchsize)
-        else:
-            self.CustomSampler = BatchSampler(RandomSampler(self.trainset), batch_size=batchsize, drop_last=False)
+        if grouped_stylization == False:
+            if self.generated_ratio > 0.0:
+                self.CustomSampler = BalancedRatioSampler(self.trainset, generated_ratio=self.generated_ratio,
+                                                    batch_size=batchsize)
+            else:
+                self.CustomSampler = BatchSampler(RandomSampler(self.trainset), batch_size=batchsize, drop_last=False)
 
-        self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
+            self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
+                                        num_workers=self.number_workers, worker_init_fn=seed_worker, 
+                                            generator=g, persistent_workers=False)
+            
+        else:
+            self.CustomSampler = ReproducibleBalancedRatioSampler(self.trainset, generated_ratio=self.generated_ratio,
+                                                 batch_size=batchsize, epoch=self.epoch)
+
+            self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
                                       num_workers=self.number_workers, worker_init_fn=seed_worker, 
                                         generator=g, persistent_workers=False)
         
@@ -368,14 +402,20 @@ class DataLoading():
         return self.trainloader, self.testloader
     
 
-    def update_set(self, epoch, start_epoch):
+    def update_set(self, epoch, start_epoch, grouped_stylization=False):
 
-        if (self.generated_ratio != 0.0 or self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
-                        
-            del self.trainset
+        if grouped_stylization == False:
+            if (self.generated_ratio != 0.0 or self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
+                            
+                del self.trainset
 
-            self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
-        
+                self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
+        else:    
+            if (self.generated_ratio != 0.0) and epoch != 0 and epoch != start_epoch:
+                    self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
+            elif (self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
+                    self.trainset.set_epoch(epoch)
+
         del self.trainloader
         gc.collect()
 
@@ -386,73 +426,3 @@ class DataLoading():
                                       generator=g, persistent_workers=False)
         
         return self.trainloader
-
-
-    def load_augmented_traindata_grouped(self, target_size, epoch=0, robust_samples=0):
-        self.robust_samples = robust_samples
-        self.target_size = target_size
-        self.generated_dataset = np.load(os.path.abspath(f'../data/{self.dataset}-add-1m-dm.npz'),
-                                    mmap_mode='r') if self.generated_ratio > 0.0 else None
-        self.epoch = epoch
-
-        torch.manual_seed(self.epoch + self.epochs * self.run)
-        np.random.seed(self.epoch + self.epochs * self.run)
-        random.seed(self.epoch + self.epochs * self.run)
-
-        self.num_generated = int(target_size * self.generated_ratio)
-        self.num_original = target_size - self.num_generated
-
-        if self.num_original > 0:
-            original_indices = torch.randperm(len(self.base_trainset))[:self.num_original]
-            original_subset = SubsetWithTransform(Subset(self.base_trainset, original_indices), self.transforms_preprocess)
-        else:
-            original_subset = None
-        
-        if self.num_generated > 0 and self.generated_dataset is not None:
-            generated_indices = np.random.choice(len(self.generated_dataset['label']), size=self.num_generated, replace=False)
-
-            generated_subset = GeneratedDataset(
-                self.generated_dataset['image'][generated_indices],
-                self.generated_dataset['label'][generated_indices],
-                transform=self.transforms_preprocess
-            )
-
-        else:
-            generated_subset = None
-        
-        self.trainset = GroupedAugmentedDataset(original_subset, generated_subset, self.transforms_basic, self.stylization_orig, 
-                                self.stylization_gen, self.transforms_orig_after_style, self.transforms_gen_after_style, 
-                                self.transforms_orig_after_nostyle, self.transforms_gen_after_nostyle, self.robust_samples, epoch)
-
-    def get_loader_grouped(self, batchsize):
-        self.batchsize = batchsize
-
-        g = torch.Generator()
-        g.manual_seed(self.epoch + self.epochs * self.run)
-
-        self.CustomSampler = ReproducibleBalancedRatioSampler(self.trainset, generated_ratio=self.generated_ratio,
-                                                 batch_size=batchsize, epoch=self.epoch)
-
-        self.trainloader = DataLoader(self.trainset, pin_memory=True, batch_sampler=self.CustomSampler,
-                                      num_workers=self.number_workers, worker_init_fn=seed_worker, 
-                                        generator=g, persistent_workers=False)
-        
-        val_workers = self.number_workers if self.dataset=='ImageNet' else 0
-        self.validationloader = DataLoader(self.validset, batch_size=batchsize, pin_memory=True, num_workers=val_workers)
-
-        return self.trainloader, self.validationloader
-
-    def update_set_grouped(self, epoch, start_epoch):
-
-        if (self.generated_ratio != 0.0) and epoch != 0 and epoch != start_epoch:
-            self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
-        elif (self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
-            self.trainset.set_epoch(epoch)
-
-        g = torch.Generator()
-        g.manual_seed(self.epoch + self.epochs * self.run)
-        self.trainloader = DataLoader(self.trainset, batch_sampler=self.CustomSampler, pin_memory=True, 
-                                      num_workers=self.number_workers, worker_init_fn=seed_worker,
-                                      generator=g, persistent_workers=False)
-        return self.trainloader
-    

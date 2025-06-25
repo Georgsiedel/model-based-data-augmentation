@@ -116,6 +116,10 @@ parser.add_argument('--generated_ratio', default=0.0, type=float, help='ratio of
                     'into every training batch')
 parser.add_argument('--n2n_deepaugment', type=utils.str2bool, nargs='?', const=False, default=False,
                     help='Whether to apply DeepAugment according to https://github.com/hendrycks/imagenet-r')
+parser.add_argument('--grouped_stylization', type=utils.str2bool, nargs='?', const=False, default=False,
+                    help='True: Stylization and caching of the next batch of images to be stylized upon dataset call. ' \
+                    'False: Stylization of all images to be stylized this epoch before training. False is faster,' \
+                    'but infeasible for large datasets as stylized subset needs to be fit into VRAM')
 parser.add_argument(
     "--int_adain_params",
     default={},
@@ -257,7 +261,7 @@ if __name__ == '__main__':
     criterion = losses.Criterion(args.loss, trades_loss=args.trades_loss, robust_loss=args.robust_loss, **lossparams)
 
     Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run, args.number_workers)
-    Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability)
+    Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability, args.grouped_stylization)
     Dataloader.load_base_data(test_only=False)
     testsets_c = Dataloader.load_data_c(subset=True, subsetsize=100, valid_run=True) if args.validonc else None
 
@@ -313,8 +317,10 @@ if __name__ == '__main__':
         # load augmented trainset and Dataloader
         Dataloader.load_augmented_traindata(target_size=len(Dataloader.base_trainset),
                                             epoch=start_epoch,
-                                            robust_samples=criterion.robust_samples)
-        trainloader, validationloader = Dataloader.get_loader(args.batchsize)
+                                            robust_samples=criterion.robust_samples,
+                                            grouped_stylization=args.grouped_stylization)
+        trainloader, validationloader = Dataloader.get_loader(args.batchsize, 
+                                                              args.grouped_stylization)
 
         if style_dir := args.int_adain_params.get("style_dir", None):
             style_dataloader = Dataloader.load_style_dataloader(
@@ -327,7 +333,7 @@ if __name__ == '__main__':
         for epoch in range(start_epoch, end_epoch):
 
             #get new generated data sample in the trainset and reset the augmentation seed for corrupted data validation
-            trainloader = Dataloader.update_set(epoch, start_epoch)
+            trainloader = Dataloader.update_set(epoch, start_epoch, args.grouped_stylization)
 
             train_acc, train_loss = train_epoch(pbar)
             valid_acc, valid_loss, valid_acc_robust, valid_acc_adv = valid_epoch(pbar, model)
