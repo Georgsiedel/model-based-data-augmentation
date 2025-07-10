@@ -409,10 +409,10 @@ class DataLoading():
                             
                 del self.trainset
 
-                self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
+                self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples, grouped_stylization=False)
         else:    
             if (self.generated_ratio != 0.0) and epoch != 0 and epoch != start_epoch:
-                    self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples)
+                    self.load_augmented_traindata(self.target_size, epoch=epoch, robust_samples=self.robust_samples, grouped_stylization=True)
             elif (self.stylization_gen is not None or self.stylization_orig is not None) and epoch != 0 and epoch != start_epoch:
                     self.trainset.set_epoch(epoch)
 
