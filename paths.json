@@ -1,0 +1,10 @@
+{
+    "data_kaggle": "/kaggle/input",
+    "trained_models_kaggle": "/kaggle/working/trained_models",
+    "style_feats_kaggle": "/kaggle/input/style_feats_adain_1000.npy",
+    "c_labels_kaggle": "/kaggle/input",
+    "data": "../data",
+    "trained_models": "../trained_models",
+    "style_feats": "../data/style_feats_adain_1000.npy",
+    "c_labels": "../data"
+}

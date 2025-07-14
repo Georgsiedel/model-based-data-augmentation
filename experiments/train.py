@@ -298,11 +298,10 @@ if __name__ == '__main__':
         swa_model, swa_scheduler = None, None
     Scaler = torch.amp.GradScaler(device=device)
     
-    checkpoint_dir = "/kaggle/working/model-based-data-augmentation/trained_models" if args.kaggle else "../trained_models"
-        
+    checkpoint_dir = Dataloader.trained_models_path
     Checkpointer = utils.Checkpoint(args.dataset, args.modeltype, args.experiment,
                                     train_corruptions, args.run, earlystopping=args.earlystop, patience=args.earlystopPatience,
-                                    verbose=False,  checkpoint_path=f'{checkpoint_dir}/checkpoint_{args.experiment}_{args.run}.pt')
+                                    verbose=False,  checkpoint_dir=checkpoint_dir)
     Traintracker = utils.TrainTracking(args.dataset, args.modeltype, args.lrschedule, args.experiment, args.run,
                             args.validonc, args.validonadv, args.swa)
 

@@ -12,6 +12,7 @@ if __name__ == '__main__':
         config = importlib.import_module(configname)
 
         grouped_stylization = False
+        kaggle = False
 
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
 
@@ -47,7 +48,7 @@ if __name__ == '__main__':
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
                     f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} " \
                     f"--n2n_deepaugment={config.n2n_deepaugment} --grouped_stylization={grouped_stylization} " \
-                    f"--kaggle={config.kaggle} "
+                    f"--kaggle={kaggle} "
             if experiment in []:
                 print('skip')
             else:
@@ -62,6 +63,6 @@ if __name__ == '__main__':
                 f"--normalize={config.normalize} --test_on_c={config.test_on_c} " \
                 f"--calculate_adv_distance={config.calculate_adv_distance} --adv_distance_params=\"{config.adv_distance_params}\" " \
                 f"--calculate_autoattack_robustness={config.calculate_autoattack_robustness} --autoattack_params=" \
-                f"\"{config.autoattack_params}\" --validontest={config.validontest} --kaggle={config.kaggle} " \
+                f"\"{config.autoattack_params}\" --validontest={config.validontest} --kaggle={kaggle} " \
                 
         os.system(cmdeval)

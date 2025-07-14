@@ -7,6 +7,7 @@ import argparse
 import ast
 import os
 import datetime
+import json
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -198,9 +199,9 @@ class Checkpoint:
     """Early stops the training if validation loss doesn't improve after a given patience.
     credit to https://github.com/Bjarten/early-stopping-pytorch/tree/master for early stopping functionality"""
 
-    def __init__(self, dataset, modeltype, experiment, train_corruption, run,
+    def __init__(self, dataset, modeltype, experiment, train_corruption, run, 
                  earlystopping=False, patience=7, verbose=False, delta=0, trace_func=print,
-                 checkpoint_path=f'../trained_models/checkpoint.pt',
+                 checkpoint_dir=f'../trained_models',
                  ):
         """
         Args:
@@ -223,8 +224,8 @@ class Checkpoint:
         self.delta = delta
         self.trace_func = trace_func
         self.early_stopping = earlystopping
-        self.checkpoint_path = os.path.abspath(checkpoint_path)
-        self.final_model_path = os.path.abspath(f'../trained_models/{dataset}/{modeltype}/config{experiment}_run_{run}.pth')
+        self.checkpoint_path = os.path.abspath(f'{checkpoint_dir}/checkpoint_{experiment}_{run}.pt')
+        self.final_model_path = os.path.abspath(f'{checkpoint_dir}/{dataset}/{modeltype}/config{experiment}_run_{run}.pth')
         os.makedirs(os.path.dirname(self.checkpoint_path), exist_ok=True)
         os.makedirs(os.path.dirname(self.final_model_path), exist_ok=True)
 
@@ -462,6 +463,15 @@ class TestTracking:
         self.report_path = os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_result_metrics.csv')
         os.makedirs(os.path.dirname(self.report_path), exist_ok=True)
 
+        file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "paths.json")
+        with open(file_path, "r") as f:
+            self.path = json.load(f)
+            suffix = '_kaggle' if self.kaggle else ''
+
+            self.data_path = self.path.get(f"data{suffix}")
+            self.c_labels_path = self.path.get(f"c_labels{suffix}")
+            self.trained_models_path = self.path.get(f"trained_models{suffix}")
+
         self.eval_count = 1
         if self.runs > 1:
             self.eval_count = self.runs + 2
@@ -500,11 +510,11 @@ class TestTracking:
 
         test_metrics_string = np.array(['Standard_Acc', 'RMSCE'])
         if self.test_on_c == True:
-            test_corruptions_label = np.loadtxt(os.path.abspath('../data/c-labels.txt'), dtype=list)
+            test_corruptions_label = np.loadtxt(os.path.abspath(f'{self.c_labels_path}/c-labels.txt'), dtype=list)
             if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
-                test_corruptions_bar_label = np.loadtxt(os.path.abspath('../data/c-bar-labels-cifar.txt'), dtype=list)
+                test_corruptions_bar_label = np.loadtxt(os.path.abspath(f'self.c_labels_path/c-bar-labels-cifar.txt'), dtype=list)
             elif self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                test_corruptions_bar_label = np.loadtxt(os.path.abspath('../data/c-bar-labels-IN.txt'), dtype=list)
+                test_corruptions_bar_label = np.loadtxt(os.path.abspath(f'self.c_labels_path/c-bar-labels-IN.txt'), dtype=list)
             test_metrics_string = np.append(test_metrics_string, test_corruptions_label, axis=0)
             test_metrics_string = np.append(test_metrics_string, test_corruptions_bar_label, axis=0)
             test_metrics_string = np.append(test_metrics_string,
@@ -538,7 +548,7 @@ class TestTracking:
         self.run = run
         self.accs = []
         print(f"Evaluating training run {run}")
-        self.filename = os.path.abspath(f'../trained_models/{self.dataset}/{self.modeltype}/config{self.experiment}' \
+        self.filename = os.path.abspath(f'{self.trained_models_path}/{self.dataset}/{self.modeltype}/config{self.experiment}' \
                    f'_run_{run}.pth')
 
     def track_results(self, new_results):
