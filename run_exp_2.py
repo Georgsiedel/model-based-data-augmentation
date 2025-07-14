@@ -46,12 +46,13 @@ if __name__ == '__main__':
                     f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
                     f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} " \
-                    f"--n2n_deepaugment={config.n2n_deepaugment} --grouped_stylization={grouped_stylization}"
+                    f"--n2n_deepaugment={config.n2n_deepaugment} --grouped_stylization={grouped_stylization} " \
+                    f"--kaggle={config.kaggle} "
             if experiment in []:
                 print('skip')
             else:
                 os.system(cmd0)
-
+            
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
         print('Beginning metric evaluation')
@@ -61,7 +62,6 @@ if __name__ == '__main__':
                 f"--normalize={config.normalize} --test_on_c={config.test_on_c} " \
                 f"--calculate_adv_distance={config.calculate_adv_distance} --adv_distance_params=\"{config.adv_distance_params}\" " \
                 f"--calculate_autoattack_robustness={config.calculate_autoattack_robustness} --autoattack_params=" \
-                f"\"{config.autoattack_params}\" --validontest={config.validontest}" \
+                f"\"{config.autoattack_params}\" --validontest={config.validontest} --kaggle={config.kaggle} " \
                 
         os.system(cmdeval)
-

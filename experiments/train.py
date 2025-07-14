@@ -128,6 +128,14 @@ parser.add_argument(
     metavar="KEY=VALUE",
     help="parameters for the chosen model",
 )
+parser.add_argument(
+    "--kaggle",
+    type=utils.str2bool,
+    nargs="?",
+    const=False,
+    default=False,
+    help="Whether to run on Kaggle or locally.",
+)
 
 args = parser.parse_args()
 configname = (f'experiments.configs.config{args.experiment}')
@@ -260,7 +268,7 @@ if __name__ == '__main__':
     lossparams = args.trades_lossparams | args.robust_lossparams | args.lossparams
     criterion = losses.Criterion(args.loss, trades_loss=args.trades_loss, robust_loss=args.robust_loss, **lossparams)
 
-    Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run, args.number_workers)
+    Dataloader = data.DataLoading(args.dataset, args.validontest, args.epochs, args.generated_ratio, args.resize, args.run, args.number_workers, kaggle=args.kaggle)
     Dataloader.create_transforms(args.train_aug_strat_orig, args.train_aug_strat_gen, args.RandomEraseProbability, args.grouped_stylization)
     Dataloader.load_base_data(test_only=False)
     testsets_c = Dataloader.load_data_c(subset=True, subsetsize=100, valid_run=True) if args.validonc else None
@@ -289,9 +297,12 @@ if __name__ == '__main__':
     else:
         swa_model, swa_scheduler = None, None
     Scaler = torch.amp.GradScaler(device=device)
+    
+    checkpoint_dir = "/kaggle/working/model-based-data-augmentation/trained_models" if args.kaggle else "../trained_models"
+        
     Checkpointer = utils.Checkpoint(args.dataset, args.modeltype, args.experiment,
                                     train_corruptions, args.run, earlystopping=args.earlystop, patience=args.earlystopPatience,
-                                    verbose=False,  checkpoint_path=f'../trained_models/checkpoint_{args.experiment}_{args.run}.pt')
+                                    verbose=False,  checkpoint_path=f'{checkpoint_dir}/checkpoint_{args.experiment}_{args.run}.pt')
     Traintracker = utils.TrainTracking(args.dataset, args.modeltype, args.lrschedule, args.experiment, args.run,
                             args.validonc, args.validonadv, args.swa)
 

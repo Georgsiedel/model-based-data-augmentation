@@ -50,7 +50,8 @@ def seed_worker(worker_id):
     fixed_worker_rng = np.random.default_rng()
 
 class DataLoading():
-    def __init__(self, dataset, validontest=True, epochs=200, generated_ratio=0.0, resize = False, run=0, number_workers=0):
+    def __init__(self, dataset, validontest=True, epochs=200, generated_ratio=0.0, 
+                 resize = False, run=0, number_workers=0, kaggle=False):
         self.dataset = dataset
         self.generated_ratio = generated_ratio
         self.resize = resize
@@ -58,6 +59,7 @@ class DataLoading():
         self.epochs = epochs
         self.validontest = validontest
         self.number_workers = number_workers
+        self.kaggle = kaggle
 
         if dataset == 'CIFAR10':
             self.factor = 1
