@@ -13,7 +13,7 @@ if __name__ == '__main__':
         config = importlib.import_module(configname)
 
         grouped_stylization = False
-        kaggle = False
+        kaggle = True
 
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
 
