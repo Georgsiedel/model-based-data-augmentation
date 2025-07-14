@@ -96,7 +96,7 @@ if __name__ == '__main__':
     Testtracker = utils.TestTracking(args.dataset, args.modeltype, args.experiment, args.runs,
                                 args.combine_test_corruptions, args.test_on_c,
                                 args.calculate_adv_distance, args.calculate_autoattack_robustness,
-                                test_corruptions, args.adv_distance_params)
+                                test_corruptions, args.adv_distance_params, args.kaggle)
 
     for run in range(args.runs):
         # Load data

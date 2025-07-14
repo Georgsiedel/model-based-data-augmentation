@@ -449,7 +449,7 @@ class TrainTracking:
 class TestTracking:
     def __init__(self, dataset, modeltype, experiment, runs, combine_test_corruptions,
                       test_on_c, calculate_adv_distance, calculate_autoattack_robustness,
-                 test_corruptions, adv_distance_params):
+                 test_corruptions, adv_distance_params, kaggle):
         self.dataset = dataset
         self.modeltype = modeltype
         self.experiment = experiment
@@ -460,6 +460,7 @@ class TestTracking:
         self.calculate_autoattack_robustness = calculate_autoattack_robustness
         self.test_corruptions = test_corruptions
         self.adv_distance_params = adv_distance_params
+        self.kaggle = kaggle
         self.report_path = os.path.abspath(f'./results/{self.dataset}/{self.modeltype}/config{self.experiment}_result_metrics.csv')
         os.makedirs(os.path.dirname(self.report_path), exist_ok=True)
 
