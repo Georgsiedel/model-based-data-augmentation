@@ -513,9 +513,9 @@ class TestTracking:
         if self.test_on_c == True:
             test_corruptions_label = np.loadtxt(os.path.abspath(f'{self.c_labels_path}/c-labels.txt'), dtype=list)
             if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
-                test_corruptions_bar_label = np.loadtxt(os.path.abspath(f'self.c_labels_path/c-bar-labels-cifar.txt'), dtype=list)
+                test_corruptions_bar_label = np.loadtxt(os.path.abspath(f'{self.c_labels_path}/c-bar-labels-cifar.txt'), dtype=list)
             elif self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
-                test_corruptions_bar_label = np.loadtxt(os.path.abspath(f'self.c_labels_path/c-bar-labels-IN.txt'), dtype=list)
+                test_corruptions_bar_label = np.loadtxt(os.path.abspath(f'{self.c_labels_path}/c-bar-labels-IN.txt'), dtype=list)
             test_metrics_string = np.append(test_metrics_string, test_corruptions_label, axis=0)
             test_metrics_string = np.append(test_metrics_string, test_corruptions_bar_label, axis=0)
             test_metrics_string = np.append(test_metrics_string,
