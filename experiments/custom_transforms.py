@@ -19,8 +19,8 @@ import torchvision.transforms as transforms
 import torchvision.transforms.v2 as transforms_v2
 
 
-def get_transforms_map(strat_name, re, dataset, factor, grouped=False):
-    transform_manager = TransformFactory(dataset, factor, re)
+def get_transforms_map(strat_name, re, dataset, factor, grouped=False, style_path="../data/style_feats_adain_1000.npy"):
+    transform_manager = TransformFactory(dataset, factor, re, style_path)
     if grouped:
         transf = transform_manager.get_transforms_grouped(strat_name)
     else:
@@ -28,16 +28,17 @@ def get_transforms_map(strat_name, re, dataset, factor, grouped=False):
     return transf
 
 class TransformFactory:
-    def __init__(self, dataset, factor, re):
+    def __init__(self, dataset, factor, re, style_path):
         self.dataset = dataset
         self.factor = factor
         self.re = re
         self.TAc = CustomTA_color()
         self.TAg = CustomTA_geometric()
+        self.style_path = style_path
 
     def _stylization(self, probability=0.95, alpha_min=0.2, alpha_max=1.0):
         vgg, decoder = style_transfer.load_models()
-        style_feats = style_transfer.load_feat_files()
+        style_feats = style_transfer.load_feat_files(self.style_path)
         pixels = 224 if self.dataset == 'ImageNet' else 32 * self.factor
         return style_transfer.NSTTransform(style_feats, vgg, decoder, alpha_min=alpha_min, alpha_max=alpha_max, probability=probability, pixels=pixels)
 

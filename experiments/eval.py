@@ -51,6 +51,14 @@ parser.add_argument('--calculate_autoattack_robustness', type=utils.str2bool, na
                     help='Whether to calculate adversarial accuracy with Autoattack with autoattack_params')
 parser.add_argument('--autoattack_params', default={'setsize': 500, 'epsilon': 8/255, 'norm': 'Linf'},
                     type=str, action=utils.str2dictAction, metavar='KEY=VALUE', help='parameters for the trades loss function')
+parser.add_argument(
+    "--kaggle",
+    type=utils.str2bool,
+    nargs="?",
+    const=False,
+    default=False,
+    help="Whether to run on Kaggle or locally.",
+)
 
 args = parser.parse_args()
 configname = (f'experiments.configs.config{args.experiment}')
@@ -88,12 +96,12 @@ if __name__ == '__main__':
     Testtracker = utils.TestTracking(args.dataset, args.modeltype, args.experiment, args.runs,
                                 args.combine_test_corruptions, args.test_on_c,
                                 args.calculate_adv_distance, args.calculate_autoattack_robustness,
-                                test_corruptions, args.adv_distance_params)
+                                test_corruptions, args.adv_distance_params, args.kaggle)
 
     for run in range(args.runs):
         # Load data
         Dataloader = data.DataLoading(dataset=args.dataset, validontest=args.validontest, generated_ratio=0.0, resize=args.resize, 
-                                      run=run, number_workers=args.number_workers)
+                                      run=run, number_workers=args.number_workers, kaggle=args.kaggle)
         Dataloader.create_transforms(train_aug_strat_orig='None', train_aug_strat_gen='None')
         Dataloader.load_base_data(test_only=True)
         workers = 0 if args.validontest else args.number_workers
