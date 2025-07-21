@@ -71,6 +71,7 @@ class DenseNet(ct_model.CtModel):
                        nn.Sequential(self.dense3, self.trans3)]
 
         self.bn = nn.BatchNorm2d(num_planes)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear = nn.Linear(num_planes, num_classes)
 
     def _make_dense_layers(self, block, in_planes, nblock):
@@ -91,7 +92,7 @@ class DenseNet(ct_model.CtModel):
                                         noise_patch_lower_scale, noise_patch_upper_scale, generated_ratio, n2n_deepaugment, 
                                         style_feats, **kwargs)
         out = self.dense4(out)
-        out = F.avg_pool2d(F.relu(self.bn(out)), 4)
+        out = self.avgpool(F.relu(self.bn(out)))
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         if self.training == True:

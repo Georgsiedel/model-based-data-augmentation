@@ -6,7 +6,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 if __name__ == '__main__':
     import importlib
 
-    for experiment in [530]:
+    for experiment in [549]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -16,11 +16,16 @@ if __name__ == '__main__':
 
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
 
-        runs = 1
+        runs = 3
+        if experiment in [451]:
+            runs = 3
+            run_iter = [0,1,2]
+        else:
+            run_iter =[1,2]
 
         for run in range(runs):
 
-            resume = True if experiment in [469] and run in [0] else False
+            resume = True if experiment in [] and run in [0] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
@@ -43,7 +48,7 @@ if __name__ == '__main__':
                     f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} " \
                     f"--n2n_deepaugment={config.n2n_deepaugment} --grouped_stylization={grouped_stylization} " \
                     f"--kaggle={kaggle} "
-            if experiment in []:
+            if experiment in [451]:
                 print('skip')
             else:
                 os.system(cmd0)

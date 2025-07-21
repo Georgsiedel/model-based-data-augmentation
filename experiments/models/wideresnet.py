@@ -94,6 +94,7 @@ class WideResNet(ct_model.CtModel):
         self.layer2 = self._wide_layer(block, nStages[2], n, dropout_rate, stride=2, activation_function=self.activation_function)
         self.layer3 = self._wide_layer(block, nStages[3], n, dropout_rate, stride=2, activation_function=self.activation_function)
         self.bn1 = nn.BatchNorm2d(nStages[3], momentum=0.9)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear = nn.Linear(nStages[3], num_classes)
         self.blocks = [self.conv1, self.layer1, self.layer2, self.layer3]
 
@@ -118,7 +119,7 @@ class WideResNet(ct_model.CtModel):
                                         noise_minibatchsize, concurrent_combinations, noise_sparsity, noise_patch_lower_scale, 
                                         noise_patch_upper_scale, generated_ratio, n2n_deepaugment, style_feats, **kwargs)
         out = self.activation_function(self.bn1(out))
-        out = F.avg_pool2d(out, 8)
+        out = self.avgpool(out)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         if self.training == True:
