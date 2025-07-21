@@ -86,6 +86,7 @@ class ResNet(ct_model.CtModel):
         self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2, activation_function=self.activation_function)
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2, activation_function=self.activation_function)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2, activation_function=self.activation_function)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear = nn.Linear(512*block.expansion, num_classes)
         self.blocks = [nn.Sequential(self.conv1, self.bn1), self.layer1, self.layer2, self.layer3]
 
@@ -109,7 +110,7 @@ class ResNet(ct_model.CtModel):
                                         noise_patch_lower_scale, noise_patch_upper_scale, generated_ratio, n2n_deepaugment, 
                                         style_feats, **kwargs)
         out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
+        out = self.avgpool(out)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         if self.training == True:

@@ -1,30 +1,30 @@
 import numpy as np
 
 train_corruptions = np.array([
-#{'noise_type': 'standard', 'epsilon': 0.0, 'sphere': False, 'distribution': 'beta2-5'},
-#{'noise_type': 'uniform-linf', 'epsilon': 0.1, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l0.5', 'epsilon': 400000.0, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l1', 'epsilon': 200.0, 'sphere': False, 'distribution': 'uniform'},
-#{'noise_type': 'uniform-l2', 'epsilon': 5.0, 'sphere': False, 'distribution': 'uniform'},
-{'noise_type': 'uniform-l0-impulse', 'epsilon': 0.2, 'sphere': False, 'distribution': 'uniform'},
+{'noise_type': 'standard', 'epsilon': 0.0, 'sphere': False, 'distribution': 'beta2-5'},
+#{'noise_type': 'uniform-linf', 'epsilon': 0.2, 'sphere': False, 'distribution': 'uniform'},
+#{'noise_type': 'uniform-l0.5', 'epsilon': 12000000.0, 'sphere': False, 'distribution': 'uniform'},
+#{'noise_type': 'uniform-l1', 'epsilon': 1500.0, 'sphere': False, 'distribution': 'uniform'},
+#{'noise_type': 'uniform-l2', 'epsilon': 20.0, 'sphere': False, 'distribution': 'uniform'},
+#{'noise_type': 'uniform-l0-impulse', 'epsilon': 0.4, 'sphere': False, 'distribution': 'uniform'},
 ])
 noise_sparsity = 1.0
 noise_patch_scale = {'lower': 0.2, 'upper': 0.7}
 combine_train_corruptions = True #augment the train dataset with all corruptions
 concurrent_combinations = 1 #only has an effect if combine_train_corruption is True
 
-batchsize = 512
+batchsize = 256
 minibatchsize = 8
-dataset = 'CIFAR100' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
+dataset = 'TinyImageNet' #ImageNet #CIFAR100 #CIFAR10 #TinyImageNet
 generated_ratio = 0.5
 normalize = True
 validontest = True
 validonc = True
 validonadv = False
 lrschedule = 'CosineAnnealingWarmRestarts'
-learningrate = 0.15
-epochs = 450
-lrparams = {'T_0': 30, 'T_mult': 2}
+learningrate = 0.1
+epochs = 600
+lrparams = {'T_0': 40, 'T_mult': 2}
 warmupepochs = 0
 earlystop = False
 earlystopPatience = 15
@@ -34,9 +34,8 @@ number_workers = 2
 modeltype = 'WideResNet_28_4'
 modelparams = {'dropout_rate': 0.2, 'activation_function': 'silu'}
 resize = False
-aug_strat_check = False
 train_aug_strat_orig = 'TAandStyle20alpha10' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
-train_aug_strat_gen = 'TAorStyle40alpha01-10' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
+train_aug_strat_gen = 'TAandStyle20alpha01-10' #TrivialAugmentWide, RandAugment, AutoAugment, AugMix
 loss = 'CrossEntropyLoss'
 lossparams = {'label_smoothing': 0.1}
 trades_loss = False
@@ -47,7 +46,7 @@ mixup = {'alpha': 0.2, 'p': 0.0} #default alpha 0.2 #If both mixup and cutmix ar
 cutmix = {'alpha': 1.0, 'p': 0.0} # default alpha 1.0 #If both mixup and cutmix are >0, mixup or cutmix are selected by 0.5 chance
 manifold = {'apply': True, 'noise_factor': 3}
 n2n_deepaugment = False
-RandomEraseProbability = 0.3
+RandomEraseProbability = 0.0
 swa = {'apply': True, 'start_factor': 0.9, 'lr_factor': 0.2}
 
 #define train and test corruptions:
