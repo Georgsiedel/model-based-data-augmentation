@@ -13,6 +13,7 @@ if __name__ == '__main__':
         config = importlib.import_module(configname)
 
         grouped_stylization = False
+        kaggle = True
 
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
  
@@ -23,7 +24,7 @@ if __name__ == '__main__':
         else:
             run_iter =[0]
 
-        for run in run_iter:
+        for run in range(runs):
 
             resume = True if experiment in [509] and run in [0] else False
 
@@ -46,14 +47,15 @@ if __name__ == '__main__':
                     f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
                     f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} " \
-                    f"--n2n_deepaugment={config.n2n_deepaugment} --grouped_stylization={grouped_stylization}"
+                    f"--n2n_deepaugment={config.n2n_deepaugment} --grouped_stylization={grouped_stylization} " \
+                    f"--kaggle={kaggle} "
             if experiment in []:
                 print('skip')
             else:
                 os.system(cmd0)
+            
+        # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
-
-        # Calculate accuracy and robustness
         print('Beginning metric evaluation')
         cmdeval = f"python experiments/eval.py --experiment={experiment} --runs={runs} --batchsize={1000} " \
                 f"--dataset={config.dataset} --modeltype={config.modeltype} --modelparams=\"{config.modelparams}\" " \
@@ -61,6 +63,6 @@ if __name__ == '__main__':
                 f"--normalize={config.normalize} --test_on_c={config.test_on_c} " \
                 f"--calculate_adv_distance={config.calculate_adv_distance} --adv_distance_params=\"{config.adv_distance_params}\" " \
                 f"--calculate_autoattack_robustness={config.calculate_autoattack_robustness} --autoattack_params=" \
-                f"\"{config.autoattack_params}\" --validontest={config.validontest}" \
-
+                f"\"{config.autoattack_params}\" --validontest={config.validontest} --kaggle={kaggle} " \
+                
         os.system(cmdeval)

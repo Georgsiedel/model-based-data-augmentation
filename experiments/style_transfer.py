@@ -21,10 +21,8 @@ from experiments.utils import plot_images
 
 encoder_rel_path = 'adaIN/vgg_normalised.pth'
 decoder_rel_path = 'adaIN/decoder.pth'
-style_feats_rel_path = '../../data/style_feats_adain_1000.npy'
 encoder_path = os.path.abspath(os.path.join(current_dir, encoder_rel_path))
 decoder_path = os.path.abspath(os.path.join(current_dir, decoder_rel_path))
-style_feats_path = os.path.abspath(os.path.join(current_dir, style_feats_rel_path))
 
 def load_models():
 
@@ -41,8 +39,9 @@ def load_models():
     decoder.eval()
     return vgg, decoder
 
-def load_feat_files():
+def load_feat_files(path):
 
+    style_feats_path = os.path.abspath(os.path.join(os.path.dirname(current_dir), path))
     style_feats_np = np.load(style_feats_path)
     style_feats_tensor = torch.from_numpy(style_feats_np)
     style_feats_tensor = style_feats_tensor.to(nst_device)
