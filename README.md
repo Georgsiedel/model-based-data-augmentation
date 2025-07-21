@@ -1,9 +1,7 @@
-run_exp.py is the test execution that calls train.py and eval.py modules from the experiments folder and allows to execute multiple experiments and runs of the same experiments successively.
+run_exp.py calls train.py and eval.py modules from the experiments folder for one or multiple experiment IDs, the seetup of which need to be defined in expereiments/configs/config_{ID}.py
 
-run_exp.py uses parameters for every experiment that are defined in a config file, stored at experiments/configs. Every config file has a number, e.g. config0.py which is called as the "experiment parameter in run_exp.py.
+The paths defined in this project reference a "data" and a "trained_models" folder on the same directory level as this project (one directory up from here).
 
-a data folder on the same level as the main repository is required, containing all the datasets for training and evaluation.
+"trained_models" and the "results"-directory use an internal folder structure: /results/{'datasetname'}/{'modelname'} and ./trained_models/{'datasetname'}/{'modelname'}.
 
-We use a sub-folder structure for trained models and their results: /results/['datasetname']/['modelname'] and /experiments/trained_models/['datasetname']/['modelname']. Please notice the Readme in said folders, as empty folders are not allowed. 
-
-The model architectures in /experiments/models are reworked with parameters such as a size factor for TinyImageNet 64x64 images using the same architecture as for CIFAR 32x32 images, as well as SiLu functions. Models also inherit a forward pass from ct_model.py to allow normalization at the model level, noise injections and mixup within the forward pass (and in deeper layers). Some model architectures may need to be adjusted to inherit from ct_model.py.
+The model architectures in /experiments/models contain a parameter "factor" for TinyImageNet's 64x64 images. This model uses the same architecture as for CIFAR 32x32 images, just with a stride=factor=2 in the first convolution. All models inherit a forward pass from ct_model.py to allow normalization as well as noise injections and mixup within the forward pass (and in deeper layers).
