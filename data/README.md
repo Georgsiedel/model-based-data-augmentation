@@ -1,5 +1,5 @@
-Example datafolder, current path in repo leads outside the workspace.
-CIFAR10 / CIFAR100 are downloaded automatically, all ImageNet, TinyImageNet, -c and -c-bar datasets need to be added.
+The current path in the repository to the data folder leads outside the workspace, one directory level higher.
+CIFAR10 / CIFAR100 are downloaded automatically to there, all ImageNet, TinyImageNet, -c and -c-bar datasets need to be added.
 
 Generated data usage requires the respective images in this folder in numpy format: "{dataset}-add-1m-dm.npz" 
 as can be downloaded from here: https://github.com/wzekai99/DM-Improves-AT 
