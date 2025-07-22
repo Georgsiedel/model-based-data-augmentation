@@ -8,6 +8,5 @@ venv/
 .venv/
 experiments/adaIN/__pycache__/
 __pycache__/
-visualization/
 .devcontainer/
 docker-compose.yml
