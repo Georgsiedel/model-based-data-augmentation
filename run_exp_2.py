@@ -6,24 +6,26 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 if __name__ == '__main__':
     import importlib
     
-    for experiment in [382,371]: 
+    for experiment in [550]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
 
         grouped_stylization = False
+        kaggle = True
 
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
 
-        runs = 5
-        if experiment == 382:
-            run_iter = [4]
+        runs = 1
+        if experiment == 550:
+            runs = 3
+            run_iter = [1,2]
         else:
-            run_iter =[3,4]
+            run_iter =[0]
 
-        for run in run_iter:
+        for run in range(runs):
             
-            resume = True if experiment in [382] and run in [3] else False
+            resume = True if experiment in [501] and run in [0] else False
 
             print("Training run #",run)
             cmd0 = f"python experiments/train.py --resume={resume} --run={run} --experiment={experiment} --epochs=" \
@@ -44,12 +46,13 @@ if __name__ == '__main__':
                     f"{config.minibatchsize} --validonc={config.validonc} --validonadv={config.validonadv} --swa=" \
                     f"\"{config.swa}\" --noise_sparsity={config.noise_sparsity} --noise_patch_scale=" \
                     f"\"{config.noise_patch_scale}\" --generated_ratio={config.generated_ratio} " \
-                    f"--n2n_deepaugment={config.n2n_deepaugment} --grouped_stylization={grouped_stylization}"
+                    f"--n2n_deepaugment={config.n2n_deepaugment} --grouped_stylization={grouped_stylization} " \
+                    f"--kaggle={kaggle} "
             if experiment in []:
                 print('skip')
             else:
                 os.system(cmd0)
-
+            
         # Calculate accuracy and robust accuracy, evaluating each trained network on each corruption
 
         print('Beginning metric evaluation')
@@ -59,7 +62,6 @@ if __name__ == '__main__':
                 f"--normalize={config.normalize} --test_on_c={config.test_on_c} " \
                 f"--calculate_adv_distance={config.calculate_adv_distance} --adv_distance_params=\"{config.adv_distance_params}\" " \
                 f"--calculate_autoattack_robustness={config.calculate_autoattack_robustness} --autoattack_params=" \
-                f"\"{config.autoattack_params}\" --validontest={config.validontest}" \
+                f"\"{config.autoattack_params}\" --validontest={config.validontest} --kaggle={kaggle} " \
                 
         os.system(cmdeval)
-

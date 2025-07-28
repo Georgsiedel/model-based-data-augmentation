@@ -53,6 +53,7 @@ class ResNeXt(ct_model.CtModel):
         self.layer2 = self._make_layer(num_blocks[1], 2)
         self.layer3 = self._make_layer(num_blocks[2], 2)
         # self.layer4 = self._make_layer(num_blocks[3], 2)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear = nn.Linear(cardinality*bottleneck_width*8, num_classes)
         self.blocks = [nn.Sequential(self.conv1, self.bn1, torch.nn.ReLU()), self.layer1, self.layer2, self.layer3]
 
@@ -77,7 +78,7 @@ class ResNeXt(ct_model.CtModel):
                                         noise_patch_lower_scale, noise_patch_upper_scale, generated_ratio, n2n_deepaugment,
                                         style_feats, **kwargs)
         # out = self.layer4(out)
-        out = F.avg_pool2d(out, 8)
+        out = self.avgpool(out)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         if self.training == True:
