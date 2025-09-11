@@ -5,7 +5,7 @@ import torch.utils
 from torch.utils.data import DataLoader, Subset
 import torchvision.transforms.v2 as transforms_v2
 import torchvision.transforms as transforms
-from run_exp import device
+from run_0 import device
 import gc
 import experiments.eval_corruption_transforms as c
 import torch
@@ -473,12 +473,19 @@ class PilToNumpy(object):
                 "Must output a float if rescaling to one."
 
     def __call__(self, image):
+        arr = np.array(image)
+
+        # Add channel dimension back if grayscale, because to PIL erased it before
+        if arr.ndim == 2:
+            arr = np.expand_dims(arr, axis=-1)
+
+        # Convert dtype as needed
         if not self.as_float:
-            return np.array(image).astype(np.uint8)
+            return arr.astype(np.uint8)
         elif not self.scaled_to_one:
-            return np.array(image).astype(np.float32)
+            return arr.astype(np.float32)
         else:
-            return np.array(image).astype(np.float32) / 255
+            return arr.astype(np.float32) / 255
 
 class NumpyToPil(object):
     def __init__(self):
@@ -487,15 +494,54 @@ class NumpyToPil(object):
     def __call__(self, image):
         return Image.fromarray(image)
 
-def build_transform_c_bar(name, severity, dataset):
-    assert dataset in ['CIFAR10', 'CIFAR100', 'ImageNet', 'TinyImageNet'],\
-            "Only cifar and imagenet image resolutions are supported."
+class TensorToNumpyUint8(object):
+    def __call__(self, tensor):
+        # tensor: torch.Tensor [C,H,W], float in [0,1]
+        arr = tensor.mul(255).byte().numpy()   # -> uint8
+        return np.transpose(arr, (1, 2, 0)) if arr.ndim == 3 else arr[0]  # CHW -> HWC
+
+class NumpyUint8ToTensor(object):
+    def __call__(self, arr):
+        if arr.ndim == 2:  # grayscale
+            arr = arr[None, ...]  # add channel dim -> (1,H,W)
+        elif arr.ndim == 3:
+            arr = np.transpose(arr, (2, 0, 1))  # HWC -> CHW
+        tensor = torch.from_numpy(arr.copy()).float() / 255.0
+        return tensor
+
+class ExpandGrayscaleTensorTo3Channels:
+    def __call__(self, x):
+        # Expect x to be a torch.Tensor of shape [C, H, W] or [B, C, H, W]
+        if isinstance(x, torch.Tensor):
+            if x.dim() == 3 and x.shape[0] == 1:  # Single image: [C, H, W]
+                return x.repeat(3, 1, 1)
+            elif x.dim() == 4 and x.shape[1] == 1:  # Batch: [B, C, H, W]
+                return x.repeat(1, 3, 1, 1)
+        # If input is PIL Image or others, just return as is (or convert if you want)
+        return x
+
+class ToFloat32:
+    def __call__(self, x):
+        return x.to(torch.float32)
+
+class DivideBy2:
+    def __call__(self, x):
+        return x / 2.0
     
-    if dataset in ['CIFAR10', 'CIFAR100']: 
+def build_transform_c_bar(name, severity, dataset, resize):
+    assert dataset in ['CIFAR10', 'CIFAR100', 'ImageNet', 'TinyImageNet', 'GTSRB', 'PCAM', 'EuroSAT', 'WaferMap'],\
+            "Dataset not defined for c-bar benchmark."
+    
+    if dataset in ['CIFAR10', 'CIFAR100', 'GTSRB']: 
         im_size = 32
-    elif dataset in ['TinyImageNet']: 
+    elif dataset in ['TinyImageNet', 'EuroSAT', 'WaferMap']: 
         im_size = 64
+    elif dataset in ['PCAM']:
+        im_size = 96
     else:
+        im_size = 224
+
+    if resize:
         im_size = 224
 
     transform_c_bar_list = [
@@ -580,7 +626,7 @@ def transform_c(image, severity=1, corruption_name=None, corruption_number=-1):
 
     if height == 32:
         scale = 'cifar'
-    elif height <= 64:
+    elif 32 < height <= 96:
         scale = 'tin'
     else: 
         scale = 'in'
@@ -609,7 +655,7 @@ def transform_c(image, severity=1, corruption_name=None, corruption_number=-1):
     return np.uint8(image_corrupted)
 
 class RandomCommonCorruptionTransform:
-    def __init__(self, set, corruption_name, dataset, csv_handler):
+    def __init__(self, set, corruption_name, dataset, csv_handler, resize):
         self.corruption_name = corruption_name
         self.set = set
         self.dataset = dataset
@@ -618,22 +664,33 @@ class RandomCommonCorruptionTransform:
         self.PILtoNP = PilToNumpy()
         self.NPtoPIL = NumpyToPil()
         self.ToTensor = transforms.ToTensor()
+        self.NumpyUint8ToTensor = NumpyUint8ToTensor()
+        self.TensorToNumpyUint8 = TensorToNumpyUint8()
+        self.resize = resize
 
     def __call__(self, img):
         severity = random.randint(1, 5)
 
         if self.set == 'c':
-            img_np = self.PILtoNP(self.TtoPIL(img))
-            corrupted_img = self.ToTensor(self.NPtoPIL(transform_c(img_np, severity=severity, corruption_name=self.corruption_name)))
+            img_np = self.TensorToNumpyUint8(img)
+            corrupted_img = self.NumpyUint8ToTensor(transform_c(img_np, severity=severity, corruption_name=self.corruption_name))
+            #img_np = self.PILtoNP(self.TtoPIL(img))
+            #corrupted_img = self.ToTensor(self.NPtoPIL(transform_c(img_np, severity=severity, corruption_name=self.corruption_name)))
         elif self.set == 'c-bar':
             severity_value = self.csv_handler.get_value(self.corruption_name, severity)
+            #comp = transforms.Compose([self.TtoPIL,
+            #                    self.PILtoNP,
+            #    build_transform_c_bar(self.corruption_name, severity_value, self.dataset, self.resize),
+            #    self.NPtoPIL,
+            #    self.ToTensor
+            #    ])
             
-            comp = transforms.Compose([self.TtoPIL,
-                                self.PILtoNP,
-                build_transform_c_bar(self.corruption_name, severity_value, self.dataset),
-                self.NPtoPIL,
-                self.ToTensor
-                ])
+            comp = transforms.Compose([
+                self.TensorToNumpyUint8,              # Tensor [0,1] float -> Numpy [0,255] uint8
+                build_transform_c_bar(self.corruption_name, severity_value, self.dataset, self.resize),
+                self.NumpyUint8ToTensor               # Numpy [0,255] uint8 -> Tensor [0,1] float
+            ])
+
             corrupted_img = comp(img)
 
         return corrupted_img

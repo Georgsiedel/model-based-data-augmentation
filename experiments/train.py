@@ -27,7 +27,7 @@ from eval_corruptions import compute_c_corruptions
 from eval_adversarial import fast_gradient_validation
 
 import torch.backends.cudnn as cudnn
-from run_exp import device
+from run_0 import device
 
 if torch.cuda.is_available():
     cudnn.benchmark = False #this slightly speeds up 32bit precision training (5%). False helps achieve reproducibility
@@ -181,14 +181,22 @@ def train_epoch(pbar):
                                            args.concurrent_combinations, args.noise_sparsity, args.noise_patch_scale['lower'],
                                            args.noise_patch_scale['upper'], Dataloader.generated_ratio, args.n2n_deepaugment, 
                                            style_feats=style_feats, **args.int_adain_params)
-            criterion.update(model, optimizer)
-            loss = criterion(outputs, mixed_targets, inputs, targets)
-        loss.retain_grad()
+            if args.trades_loss:
+                with torch.amp.autocast(device_type=device, enabled=False): # recommended for numerical stability
+                    loss = losses.trades_loss(model,
+                    inputs,
+                    targets,
+                    optimizer,
+                    **args.trades_lossparams)
+            else:    
+                criterion.update(model, optimizer)
+                loss = criterion(outputs, mixed_targets, inputs, targets)
 
         Scaler.scale(loss).backward()
-
         Scaler.unscale_(optimizer)
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0, norm_type=2.0)
+
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
         Scaler.step(optimizer)
         Scaler.update()
         if device == 'cuda':
@@ -196,13 +204,23 @@ def train_epoch(pbar):
         train_loss += loss.item()
 
         _, predicted = outputs.max(1)
-        if np.ndim(mixed_targets) == 2:
+        
+        if args.dataset in ['WaferMap']:
+            predicted = (outputs > 0.5).float()    
+            mixed_targets = (mixed_targets > 0.5).float()   
+        elif np.ndim(mixed_targets) == 2:    
             _, mixed_targets = mixed_targets.max(1)
+
         if criterion.robust_samples >= 1:
             mixed_targets = torch.cat([mixed_targets] * (criterion.robust_samples+1), 0)
 
         total += mixed_targets.size(0)
-        correct += predicted.eq(mixed_targets).sum().item()
+        if args.dataset in ['WaferMap']:
+                matches = predicted.eq(targets)  # shape: [batch_size, num_labels]
+                exact_match = matches.all(dim=1)  # shape: [batch_size], bool tensor
+                correct += exact_match.sum().item()
+        else:
+            correct += predicted.eq(mixed_targets).sum().item()
         avg_train_loss = train_loss / (batch_idx + 1)
         pbar.set_description('[Train] Loss: {:.3f} | Acc: {:.3f} ({}/{})'.format(
             avg_train_loss, 100. * correct / total, correct, total))
@@ -233,9 +251,19 @@ def valid_epoch(pbar, net):
                 loss = criterion.test(outputs, targets)
 
             test_loss += loss.item()
-            _, predicted = outputs.max(1)
+
+            if args.dataset in ['WaferMap']:
+                predicted = (outputs > 0.5).float()    
+            else:
+                _, predicted = outputs.max(1)
+
             total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
+            if args.dataset in ['WaferMap']:
+                matches = predicted.eq(targets)  # shape: [batch_size, num_labels]
+                exact_match = matches.all(dim=1)  # shape: [batch_size], bool tensor
+                correct += exact_match.sum().item()
+            else:
+                correct += predicted.eq(targets).sum().item()
             avg_test_loss = test_loss / (batch_idx + 1)
             pbar.set_description(
                 '[Valid] Loss: {:.3f} | Acc: {:.3f} ({}/{}) | Adversarial Acc: {:.3f}'.format(avg_test_loss, 100. * correct / total,
@@ -315,8 +343,8 @@ if __name__ == '__main__':
         print('\nResuming from checkpoint after epoch', start_epoch)
     
     # Calculate steps and epochs
-    total_steps, start_steps = utils.calculate_steps(args.dataset, args.batchsize, args.epochs, start_epoch, args.warmupepochs,
-                                        args.validontest, args.validonc, args.swa['apply'], args.swa['start_factor'])
+    total_steps, start_steps = utils.calculate_steps(Dataloader.base_trainset, Dataloader.testset, args.batchsize, args.epochs, 
+                                    start_epoch, args.warmupepochs, args.validonc, args.swa['apply'], args.swa['start_factor'])
     
     with tqdm(total=total_steps, initial=start_steps) as pbar:
         

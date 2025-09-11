@@ -12,7 +12,7 @@ import torch.distributions as dist
 from data import normalization_values
 from utils import plot_images
 from itertools import chain
-from run_exp import device
+from run_0 import device
 
 def random_erasing_style_mask(batch, noise_patch_lower_scale=0.3, noise_patch_upper_scale=1.0, ratio=[0.3, 3.3]):
         """Get image mask for Patched Noise. Rectangle fully inside the image, as in RandomErasing
@@ -86,7 +86,7 @@ def apply_noise_add_and_mult(batch, minibatchsize, corruptions, normalized, data
     if corruptions is None:
         return batch
     #Calculate the mean values for each channel across all images
-    mean, std = normalization_values(batch, dataset, normalized, manifold, manifold_factor)
+    mean, std = normalization_values(batch, dataset, normalized, manifold, manifold_factor, verbose=False)
     minibatches = batch.view(-1, minibatchsize, batch.size()[1], batch.size()[2], batch.size()[3])
     new_batches = []
     for id, minibatch in enumerate(minibatches):
@@ -224,7 +224,7 @@ def apply_noise(batch, minibatchsize, corruptions, concurrent_combinations, norm
     if corruptions is None:
         return batch
     #Calculate the mean values for each channel across all images
-    mean, std = normalization_values(batch, dataset, normalized, manifold, manifold_factor)
+    mean, std = normalization_values(batch, dataset, normalized, manifold, manifold_factor, verbose=False)
 
     # Throw out noise outside Gaussian, (L0) and Linf for manifold noise (since epsilon is dependent on dimensionality)
     if manifold:

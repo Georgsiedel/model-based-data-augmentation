@@ -123,29 +123,10 @@ def plot_images(number, mean, std, images, corrupted_images = None, second_corru
     plt.tight_layout()  # Adjust layout to prevent overlapping
     plt.show()
 
-def calculate_steps(dataset, batchsize, epochs, start_epoch, warmupepochs, validontest, validonc, swa, swa_start_factor):
+def calculate_steps(trainset, validset, batchsize, epochs, start_epoch, warmupepochs, validonc, swa, swa_start_factor):
     #+0.5 is a way of rounding up to account for the last partial batch in every epoch
-    if dataset == 'ImageNet':
-        if validontest == True:
-            trainsteps_per_epoch = round(1281167 / batchsize + 0.5)
-            validsteps_per_epoch = round(50000 / batchsize + 0.5)
-        else:
-            trainsteps_per_epoch = round(0.8 * 1281167 / batchsize + 0.5)
-            validsteps_per_epoch = round(0.2 * 1281167 / batchsize + 0.5)
-    elif dataset == 'TinyImageNet':
-        if validontest == True:
-            trainsteps_per_epoch = round(100000 / batchsize + 0.5)
-            validsteps_per_epoch = round(10000 / batchsize + 0.5)
-        else:
-            trainsteps_per_epoch = round(0.8 * 100000 / batchsize + 0.5)
-            validsteps_per_epoch = round(0.2 * 100000 / batchsize + 0.5)
-    elif dataset == 'CIFAR10' or dataset == 'CIFAR100':
-        if validontest == True:
-            trainsteps_per_epoch = round(50000 / batchsize + 0.5)
-            validsteps_per_epoch = round(10000 / batchsize + 0.5)
-        else:
-            trainsteps_per_epoch = round(0.8 * 50000 / batchsize + 0.5)
-            validsteps_per_epoch = round(0.2 * 50000 / batchsize + 0.5)
+    trainsteps_per_epoch = round(len(trainset) / batchsize + 0.5)
+    validsteps_per_epoch = round(len(validset) / batchsize + 0.5)     
 
     if validonc == True:
         validsteps_per_epoch += 1
@@ -488,7 +469,7 @@ class TestTracking:
             self.adv_count = len(self.adv_distance_params["norm"]) * (2+len(self.adv_distance_params["clever_samples"])) + 1
             self.test_count += self.adv_count
         if calculate_autoattack_robustness:
-            self.test_count += 2
+            self.test_count += 1
 
         self.all_test_metrics = np.empty([self.test_count, self.runs])
 
@@ -512,10 +493,12 @@ class TestTracking:
         test_metrics_string = np.array(['Standard_Acc', 'RMSCE'])
         if self.test_on_c == True:
             test_corruptions_label = np.loadtxt(os.path.abspath(f'{self.c_labels_path}/c-labels.txt'), dtype=list)
-            if self.dataset == 'CIFAR10' or self.dataset == 'CIFAR100':
+            if self.dataset in ['CIFAR10', 'CIFAR100', 'GTSRB', 'EuroSAT', 'PCAM', 'WaferMap']:
                 test_corruptions_bar_label = np.loadtxt(os.path.abspath(f'{self.c_labels_path}/c-bar-labels-cifar.txt'), dtype=list)
             elif self.dataset == 'ImageNet' or self.dataset == 'TinyImageNet':
                 test_corruptions_bar_label = np.loadtxt(os.path.abspath(f'{self.c_labels_path}/c-bar-labels-IN.txt'), dtype=list)
+            else:
+                print('no c-bar corruption types defined for this dataset')
             test_metrics_string = np.append(test_metrics_string, test_corruptions_label, axis=0)
             test_metrics_string = np.append(test_metrics_string, test_corruptions_bar_label, axis=0)
             test_metrics_string = np.append(test_metrics_string,
@@ -533,8 +516,7 @@ class TestTracking:
                                                         [f'{n}-norm-Mean_CLEVER-{b}-samples'], axis=0)
         if self.calculate_autoattack_robustness == True:
             test_metrics_string = np.append(test_metrics_string,
-                                                ['Adversarial_accuracy_autoattack', 'Mean_adv_distance_autoattack)'],
-                                                axis=0)
+                                                ['Adversarial_accuracy_autoattack'])
         if self.combine_test_corruptions == True:
             test_metrics_string = np.append(test_metrics_string, ['Combined_Noise'])
         else:
