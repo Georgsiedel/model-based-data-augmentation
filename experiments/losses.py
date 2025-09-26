@@ -9,6 +9,8 @@ def get_criterion(loss_function, lossparams):
         criterion, robust_samples = JsdCrossEntropy(**lossparams), lossparams["num_splits"] - 1
     elif loss_function == 'trades':
         criterion, robust_samples = Trades(**lossparams), 0
+    elif loss_function == 'bce':
+        criterion, robust_samples = torch.nn.BCELoss(**lossparams), 0
     else:
         criterion, robust_samples = torch.nn.CrossEntropyLoss(label_smoothing=lossparams["smoothing"]), 0
     test_criterion = torch.nn.CrossEntropyLoss()
@@ -76,7 +78,7 @@ class Trades(nn.Module):
 
     def __call__(self, x_natural, y):
         # define KL-loss
-        criterion_kl = nn.KLDivLoss(size_average=False)
+        criterion_kl = nn.KLDivLoss(reduction='sum')
 
         self.model.eval()
         batch_size = len(x_natural)
@@ -167,32 +169,32 @@ class JsdCrossEntropy(nn.Module):
         return loss
 
 
-def trades_loss(model, x_natural, y, optimizer, step_size=0.003, epsilon=0.031, perturb_steps=10, beta=1.0,
-                attack='l_inf'):
-    """
-    TRADES training (Zhang et al, 2019).
-    """
-
+def trades_loss(model,
+                x_natural,
+                y,
+                optimizer,
+                step_size=0.003,
+                epsilon=0.031,
+                perturb_steps=10,
+                beta=1.0,
+                distance='l_inf'):
     # define KL-loss
     criterion_kl = nn.KLDivLoss(reduction='sum')
     model.eval()
     batch_size = len(x_natural)
     # generate adversarial example
     x_adv = x_natural.detach() + 0.001 * torch.randn(x_natural.shape).cuda().detach()
-    logits_natural = model(x_natural)
-    p_natural = F.softmax(logits_natural, dim=1)
-
-    if attack == 'l_inf':
+    if distance == 'l_inf':
         for _ in range(perturb_steps):
             x_adv.requires_grad_()
             with torch.enable_grad():
-                loss_kl = criterion_kl(F.log_softmax(model(x_adv), dim=1), p_natural)
+                loss_kl = criterion_kl(F.log_softmax(model(x_adv), dim=1),
+                                       F.softmax(model(x_natural), dim=1))
             grad = torch.autograd.grad(loss_kl, [x_adv])[0]
             x_adv = x_adv.detach() + step_size * torch.sign(grad.detach())
             x_adv = torch.min(torch.max(x_adv, x_natural - epsilon), x_natural + epsilon)
             x_adv = torch.clamp(x_adv, 0.0, 1.0)
-
-    elif attack == 'l_2':
+    elif distance == 'l_2':
         delta = 0.001 * torch.randn(x_natural.shape).cuda().detach()
         delta = Variable(delta.data, requires_grad=True)
 
@@ -205,8 +207,9 @@ def trades_loss(model, x_natural, y, optimizer, step_size=0.003, epsilon=0.031, 
             # optimize
             optimizer_delta.zero_grad()
             with torch.enable_grad():
-                loss = (-1) * criterion_kl(F.log_softmax(model(adv), dim=1), p_natural)
-            loss.backward(retain_graph=True)
+                loss = (-1) * criterion_kl(F.log_softmax(model(adv), dim=1),
+                                           F.softmax(model(x_natural), dim=1))
+            loss.backward()
             # renorming gradient
             grad_norms = delta.grad.view(batch_size, -1).norm(p=2, dim=1)
             delta.grad.div_(grad_norms.view(-1, 1, 1, 1))
@@ -221,17 +224,16 @@ def trades_loss(model, x_natural, y, optimizer, step_size=0.003, epsilon=0.031, 
             delta.data.renorm_(p=2, dim=0, maxnorm=epsilon)
         x_adv = Variable(x_natural + delta, requires_grad=False)
     else:
-        raise ValueError(f'Attack={attack} not supported for TRADES training!')
+        x_adv = torch.clamp(x_adv, 0.0, 1.0)
     model.train()
 
     x_adv = Variable(torch.clamp(x_adv, 0.0, 1.0), requires_grad=False)
-
+    # zero gradient
     optimizer.zero_grad()
     # calculate robust loss
-    logits_adv = model(x_adv)
-    loss_natural = F.cross_entropy(logits_natural, y)
-    loss_robust = (1.0 / batch_size) * criterion_kl(F.log_softmax(logits_adv, dim=1),
-                                                    F.softmax(logits_natural, dim=1))
+    logits = model(x_natural)[0] #changed for ct_model outputs a tuple with mixed_targets
+    loss_natural = F.cross_entropy(logits, y)
+    loss_robust = (1.0 / batch_size) * criterion_kl(F.log_softmax(model(x_adv)[0], dim=1),
+                                                    F.softmax(model(x_natural)[0], dim=1))
     loss = loss_natural + beta * loss_robust
-
     return loss

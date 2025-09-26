@@ -7,7 +7,7 @@ import torchvision.transforms as transforms
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, Sampler, DataLoader
 import numpy as np
-from run_exp import device
+from run_0 import device
 
 def custom_collate_fn(batch, batch_transform_orig, batch_transform_gen, image_transform_orig, 
                       image_transform_gen, generated_ratio, batchsize):
@@ -50,11 +50,18 @@ class SwaLoader():
 
         return swa_dataloader
     
-class GeneratedDataset(Dataset):
+class NumpyDataset(Dataset):
     def __init__(self, images, labels, transform=None):
         self.images = images
         self.labels = labels
         self.transform = transform
+
+        self.labels = []
+        for lbl in labels:
+            if isinstance(lbl, np.ndarray):
+                self.labels.append(torch.from_numpy(lbl).float())
+            else:
+                self.labels.append(int(lbl))
 
     def __len__(self):
         return len(self.labels)
@@ -69,12 +76,11 @@ class GeneratedDataset(Dataset):
 
     def __getitem__(self, idx):
         image = self.images[idx]
-        label = int(self.labels[idx])
 
         if self.transform:
             image = self.transform(image)
 
-        return image, label
+        return image, self.labels[idx]
     
 class ListDataset(Dataset):
     def __init__(self, data):
@@ -406,6 +412,23 @@ class AugmentedDataset(torch.utils.data.Dataset):
         self.total_size = self.num_original + self.num_generated
 
         assert len(style_mask) == self.num_original + self.num_generated
+    
+    def handle_label(self, y):
+        """
+        Handle label for both single-label and multi-label cases.
+        - If y is scalar-like -> return int(y)
+        - Else -> return float tensor
+        """
+        if torch.is_tensor(y):
+            if y.ndim == 0 or (y.ndim == 1 and y.numel() == 1):
+                # Single scalar tensor
+                return int(y.item())
+            else:
+                # Multi-label or continuous tensor
+                return y.to(torch.float32)
+        else:
+            # Non-tensor case (e.g., int from dataset)
+            return int(y)
 
     def __getitem__(self, idx):
 
@@ -420,8 +443,10 @@ class AugmentedDataset(torch.utils.data.Dataset):
 
         augment = transforms.Compose([self.transforms_basic, aug])
 
+        y = self.handle_label(y)
+
         if self.robust_samples == 0:
-            return augment(x), int(y)
+            return augment(x), y
     
         elif self.robust_samples >= 1:
             if idx < self.num_original:
@@ -430,9 +455,9 @@ class AugmentedDataset(torch.utils.data.Dataset):
                 x0 = self.stylized_generated_dataset.getclean(idx - self.num_original)
 
             if self.robust_samples == 1:
-                return (self.transforms_basic(x0), augment(x)), int(y)
+                return (self.transforms_basic(x0), augment(x)), y
             elif self.robust_samples == 2:
-                return (self.transforms_basic(x0), augment(x), augment(x)), int(y)
+                return (self.transforms_basic(x0), augment(x), augment(x)), y
 
     def __len__(self):
         return self.total_size
@@ -451,9 +476,11 @@ class StyleDataset(Dataset):
             for file in os.listdir(root_dir)
             if file.endswith(".jpg")
         ]
-        if dataset_type in ["CIFAR10", "CIFAR100"]:
+        if dataset_type in ["CIFAR10", "CIFAR100", "GTSRB"]:
             self.transform = transforms.Resize((32, 32), antialias=True)
-        elif dataset_type == "TinyImageNet":
+        elif dataset_type in ["TinyImageNet", "EuroSAT"]:
+            self.transform = transforms.Resize((64, 64), antialias=True)
+        elif dataset_type == "PCAM":
             self.transform = transforms.Resize((64, 64), antialias=True)
         elif dataset_type == "ImageNet":
             self.transform = transforms.Resize((224, 224), antialias=True)
