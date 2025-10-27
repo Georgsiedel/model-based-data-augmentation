@@ -6,18 +6,16 @@ import gc
 
 import torch
 import torchvision.transforms as transforms
-import torchvision.transforms.v2 as transforms_v2
 from sklearn.model_selection import train_test_split
 import torchvision
 from torch.utils.data import Subset, ConcatDataset, RandomSampler, BatchSampler, DataLoader, TensorDataset
 import numpy as np
-from PIL import Image
 from torchvision.datasets import ImageFolder
 from torchvision import transforms
 import experiments.custom_transforms as custom_transforms
 from run_0 import device
 from experiments.utils import plot_images, CsvHandler
-from experiments.custom_datasets import SubsetWithTransform, NumpyDataset, AugmentedDataset, ListDataset, CustomDataset 
+from experiments.custom_datasets import SubsetWithTransform, NumpyDataset, AugmentedDataset, CustomDataset 
 from experiments.custom_datasets import BalancedRatioSampler, GroupedAugmentedDataset, ReproducibleBalancedRatioSampler, StyleDataset
 
 def normalization_values(batch, dataset, normalized, manifold=False, manifold_factor=1, verbose=False):

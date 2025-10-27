@@ -8,7 +8,6 @@ if module_path not in sys.path:
 
 import numpy as np
 import torch
-import torch.backends.cudnn as cudnn
 import torch.utils.data
 from torchmetrics.classification import MulticlassCalibrationError, BinaryCalibrationError
 import argparse

@@ -2,9 +2,7 @@ import random
 import torch
 import os
 from PIL import Image
-import torch.cuda.amp
 import torchvision.transforms as transforms
-from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, Sampler, DataLoader
 import numpy as np
 from run_0 import device

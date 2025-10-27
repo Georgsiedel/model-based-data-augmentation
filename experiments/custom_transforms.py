@@ -1,23 +1,17 @@
 import random
 import torch
-import torch.cuda.amp
-import torch.utils
 from torch.utils.data import DataLoader, Subset
 import torchvision.transforms.v2 as transforms_v2
 import torchvision.transforms as transforms
 from run_0 import device
 import gc
 import experiments.eval_corruption_transforms as c
-import torch
 from PIL import Image
 import numpy as np
-import time
 from experiments.utils import plot_images
 import experiments.style_transfer as style_transfer
 from experiments.custom_datasets import StylizedTensorDataset
-import torchvision.transforms as transforms
-import torchvision.transforms.v2 as transforms_v2
-
+import torchvision.transforms.functional as F
 
 def get_transforms_map(strat_name, re, dataset, factor, grouped=False, style_path="../data/style_feats_adain_1000.npy"):
     transform_manager = TransformFactory(dataset, factor, re, style_path)
