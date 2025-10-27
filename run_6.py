@@ -6,7 +6,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 if __name__ == '__main__':
     import importlib
     
-    for experiment in [547]:
+    for experiment in [543,532]:
 
         configname = (f'experiments.configs.config{experiment}')
         config = importlib.import_module(configname)
@@ -17,7 +17,6 @@ if __name__ == '__main__':
         print('Starting experiment #',experiment, 'on', config.dataset, 'dataset')
 
         runs = 3
-        run_iter =[1]
 
         for run in range(runs):
             
