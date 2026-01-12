@@ -1,17 +1,146 @@
-This is the repository for the paper "Stylized Synthetic Augmentation further improves Corruption Robustness", available here: https://arxiv.org/abs/2512.15675
-We train image classification models with additional synthetic data as well as stylization. The repository allows to configure a multitude of additional data augmentation strategies.
+# Stylized Synthetic Augmentation Further Improves Corruption Robustness
 
-run_exp.py calls train.py and eval.py modules from the experiments folder for one or multiple experiment IDs, the setup of which need to be defined in experiments/configs/config_{ID}.py
+This repository accompanies the paper **“Stylized Synthetic Augmentation Further Improves Corruption Robustness”**, available here:  
+https://arxiv.org/abs/2512.15675
 
-paths.json lets you adjusts the paths to important directories containing data in order to allow other repository structures or the use of e.g. Kaggle.
-As standard, the paths defined reference "data" and "trained_models" repositories on the same directory level as the project (one level up).
+We train image classification models using additional synthetic data and stylization. The repository provides flexible configuration of multiple data augmentation strategies and experiment setups.
 
-CIFAR10 / CIFAR100 are downloaded automatically to "data", but all ImageNet, TinyImageNet, -c and -c-bar datasets need to be added.
-Similarly, generated data usage (setting generate_ratio >0.0) requires the respective images in "data" in numpy format: "{dataset}-add-1m-dm.npz" as can be downloaded from here: https://github.com/wzekai99/DM-Improves-AT or generated here: https://github.com/NVlabs/edm
+---
 
-The folder "data" given here contains information for the c- and c-bar datasets, which must also be in the final "data" repository with all other data as described above. Note that currently, the "data"-path according to paths.json is one level above!
+## 🧭 Overview
 
-Stylization in our implementation requires encoded image features from the painter-by-numbers dataset to be put into the data repository and named "style_feats_adain_1000.npy". For reproduction of our results, download the 1000 image features used by us from here: https://zenodo.org/records/16279015
+- Training of corruption-robust image classifiers  
+- Support for **synthetic data augmentation**  
+- Support for **stylization-based augmentation**  
+- Flexible experiment configuration  
+- Works with multiple datasets and repository structures
 
-The model architectures in /experiments/models contain a parameter "factor" for TinyImageNet's 64x64 images. This model uses the same architecture as for CIFAR 32x32 images, just with a stride=factor=2 in the first convolution. All models inherit a forward pass from ct_model.py to allow normalization, noise injections and mixup within the forward pass (and in deeper layers).
+---
+
+## 📂 Repository Structure
+
+- `run_exp.py` – main experiment launcher  
+- `experiments/`
+  - `train.py` – training script  
+  - `eval.py` – evaluation script  
+  - `configs/config_{ID}.py` – experiment configuration files  
+- `experiments/models/` – model definitions  
+- `paths.json` – configuration for dataset and checkpoint paths  
+- `data/` – contains information for c and c-bar datasets
+
+---
+
+## ▶️ Running Experiments
+
+`run_exp.py` runs one or multiple experiment IDs.
+
+Each experiment setup must be defined in
+`experiments/configs/config_{ID}.py`
+
+
+Internally, the launcher calls:
+
+- `experiments/train.py`
+- `experiments/eval.py`
+
+---
+
+## 🛠 Path Configuration
+
+Use `paths.json` to specify directories for:
+
+- datasets
+- pretrained or trained models
+- external storage layouts (e.g., Kaggle, custom structures)
+
+Default expectation:
+
+project_root/
+
+├── repository/
+
+├── data/
+
+└── trained_models/
+
+
+> The `data/` folder inside this repository only contains information for c and c-bar datasets; full datasets must be placed in the external `data/` directory referenced in `paths.json`.
+
+---
+
+## 📚 Datasets
+
+### Automatically downloaded
+- CIFAR-10  
+- CIFAR-100  
+
+Both are placed automatically into `data/`.
+
+### Must be added manually
+- ImageNet  
+- TinyImageNet  
+- Corrupted variants:
+  - `-c`
+  - `-c-bar`
+
+---
+
+## 🧪 Synthetic Data Usage
+
+To enable generated data (`generate_ratio > 0.0`), place `.npz` files in `data/` with the naming pattern:
+`{dataset}-add-1m-dm.npz`
+
+
+They can be obtained from:
+
+- https://github.com/wzekai99/DM-Improves-AT  
+or generated via:
+
+- https://github.com/NVlabs/edm
+
+---
+
+## 🎨 Stylization Features
+
+Stylization requires encoded image features from **Painter-by-Numbers**.
+
+Required file in `data/`:
+`style_feats_adain_1000.npy`
+
+
+For exact reproduction, download the 1000 features used here:
+
+- https://zenodo.org/records/16279015
+
+---
+
+## 🧭 Model Architectures
+
+Models are located in:
+`experiments/models/`
+
+
+Key characteristics:
+
+- include parameter `factor` for TinyImageNet (64×64)
+- same base architecture as CIFAR (32×32)
+- first convolution uses stride = `factor = 2` for TinyImageNet
+- all models inherit forward pass from `ct_model.py`, enabling:
+  - normalization  
+  - noise injection  
+  - mixup  
+  - deeper-layer augmentations  
+
+---
+
+## ✅ Capabilities Summary
+
+- corruption-robust training  
+- integration of synthetic and stylized data  
+- configurable experiment setups  
+- flexible path handling  
+- unified augmentation control inside the forward pass
+
+---
+
 
