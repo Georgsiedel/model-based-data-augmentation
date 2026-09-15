@@ -1,6 +1,6 @@
 # Stylized Synthetic Augmentation Further Improves Corruption Robustness
 
-This repository accompanies the paper **“Stylized Synthetic Augmentation Further Improves Corruption Robustness”**, available here:  
+This repository accompanies the VISAPP 2026 paper **“Stylized Synthetic Augmentation Further Improves Corruption Robustness”**, available here:  
 https://arxiv.org/abs/2512.15675
 
 We train image classification models using additional synthetic data and stylization. The repository provides flexible configuration of multiple data augmentation strategies and experiment setups.
