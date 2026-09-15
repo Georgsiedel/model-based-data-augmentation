@@ -13,7 +13,7 @@ We train image classification models using additional synthetic data and styliza
 - Support for **synthetic data augmentation**  
 - Support for **stylization-based augmentation**  
 - Flexible experiment configuration  
-- Works with multiple datasets and repository structures
+- Works with multiple benchmark datasets
 
 ---
 
@@ -64,7 +64,7 @@ project_root/
 └── trained_models/
 
 
-> The `data/` folder inside this repository only contains information for c and c-bar datasets; full datasets must be placed in the external `data/` directory referenced in `paths.json`.
+> The `data/` folder inside this repository only contains information for c and c-bar datasets; full datasets should be placed in the external `data/` directory referenced in `paths.json`.
 
 ---
 
@@ -122,9 +122,7 @@ Models are located in:
 
 Key characteristics:
 
-- include parameter `factor` for TinyImageNet (64×64)
-- same base architecture as CIFAR (32×32)
-- first convolution uses stride = `factor = 2` for TinyImageNet
+- include parameter `factor`, which injects a stride factor in the first conv layer in order to adapt CIFAR (32×32) architectures for TinyImageNet (64×64)
 - all models inherit forward pass from `ct_model.py`, enabling:
   - normalization  
   - noise injection  
